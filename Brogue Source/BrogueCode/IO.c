@@ -1379,8 +1379,8 @@ void getCellAppearance(short x, short y, uchar *returnChar, color *returnForeCol
             cellBackColor.green = clamp(cellBackColor.green, 0, 100);
         }
     }
-	
-	*returnChar = cellChar;
+
+	*returnChar = -cellChar; // ORYX
 	*returnForeColor = cellForeColor;
 	*returnBackColor = cellBackColor;
     
@@ -3712,7 +3712,7 @@ void printDiscoveries(short category, short count, unsigned short itemCharacter,
 	for (i = 0; i < count; i++) {
 		if (theTable[i].identified) {
 			theColor = &white;
-			plotCharToBuffer(itemCharacter, x, y + i, &itemColor, &black, dbuf);
+			plotCharToBuffer(-itemCharacter, x, y + i, &itemColor, &black, dbuf); //ORYX
 		} else {
 			theColor = &darkGray;
             magic = magicCharDiscoverySuffix(category, i);

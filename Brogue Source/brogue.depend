@@ -7814,3 +7814,101 @@
 	"IncludeGlobals.h"
 	<math.h>
 
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\architect.c
+	"Rogue.h"
+	"IncludeGlobals.h"
+
+1498614717 c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\rogue.h
+	<stdio.h>
+	<stdlib.h>
+	<string.h>
+	"PlatformDefines.h"
+	<assert.h>
+
+1498614917 c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\platformcode\platformdefines.h
+
+1498614717 c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\includeglobals.h
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\buttons.c
+	"Rogue.h"
+	"IncludeGlobals.h"
+	<math.h>
+	<time.h>
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\combat.c
+	<math.h>
+	"Rogue.h"
+	"IncludeGlobals.h"
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\dijkstra.c
+	"Rogue.h"
+	"IncludeGlobals.h"
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\globals.c
+	"Rogue.h"
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\grid.c
+	"Rogue.h"
+	"IncludeGlobals.h"
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\io.c
+	<math.h>
+	<time.h>
+	"Rogue.h"
+	"IncludeGlobals.h"
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\items.c
+	"Rogue.h"
+	"IncludeGlobals.h"
+	<math.h>
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\light.c
+	<math.h>
+	"Rogue.h"
+	"IncludeGlobals.h"
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\mainmenu.c
+	"Rogue.h"
+	"IncludeGlobals.h"
+	<math.h>
+	<time.h>
+	<limits.h>
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\monsters.c
+	<math.h>
+	"Rogue.h"
+	"IncludeGlobals.h"
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\movement.c
+	"Rogue.h"
+	"IncludeGlobals.h"
+	<math.h>
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\random.c
+	<math.h>
+	<time.h>
+	<limits.h>
+	<stdint.h>
+	"Rogue.h"
+	"IncludeGlobals.h"
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\recordings.c
+	<math.h>
+	<time.h>
+	<limits.h>
+	"Rogue.h"
+	"IncludeGlobals.h"
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\roguemain.c
+	"Rogue.h"
+	"IncludeGlobals.h"
+	<math.h>
+	<time.h>
+
+1498614717 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\broguecode\time.c
+	"Rogue.h"
+	"IncludeGlobals.h"
+	<math.h>
+
+1498614255 source:c:\users\brian\desktop\brogue174_win-codeblocks\brogue source\icon.rc
+

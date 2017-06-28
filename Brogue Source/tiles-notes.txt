@@ -1,0 +1,17 @@
+BROGUE TILES
+
+Art by Oryx
+www.oryxdesignlab.com
+
+Tile specific code by Joshua Day
+v1.7.4 Tile update by Pat Labine
+
+f4 toggles animation
+f6 toggles color dancing
+
+Version notes:
+
+There are now 2 different font sizes (small and large) which can be toggled using the + and - keys
+The large font is the default and intended tile size.
+The small font is a scaled version of the large font and may have minor readability or sub-pixel errors. These will be improved and fixed with new versions.
+

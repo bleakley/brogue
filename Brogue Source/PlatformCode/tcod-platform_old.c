@@ -19,39 +19,12 @@ struct mouseState {int x, y, lmb, rmb;};
 static int isFullScreen = false;
 static int hasMouseMoved = false;
 
-static struct bufferCell {
-	TCOD_color_t fore, back;
-	int glyph, block, ms, dirty;
-} buffer_cells[COLS * ROWS];
-
-static int ms_passed = 0; // milliseconds since last refresh
-
-static struct glyphInfo {
-	int isWall;
-} glyphTable[256] = {{0}};
-
-#define BUFFER(x, y) (buffer_cells[(x) + (y) * COLS])
-
 static TCOD_key_t bufferedKey = {TCODK_NONE};
 static struct mouseState brogueMouse = {0, 0, 0, 0};
 static struct mouseState missedMouse = {-1, -1, 0, 0};
 
 static int desktop_width, desktop_height;
 
-static void init_glyphTable()
-{
-	int wallsProper[] = {0x23, 0x39, 0xe1, 0x00};
-	int wallGlyphs[] = {0x3c, 0x3d, 0xb1, 0xc0, 0xc1, 0xe5, 0xe9, 0xea, 0x00};
-
-	int *glyph;
-
-	glyph = wallGlyphs;
-	while (*glyph) glyphTable[*(glyph++)].isWall = 1;
-
-	glyph = wallsProper;
-	while (*glyph) glyphTable[*(glyph++)].isWall = 2;
-}
-/*
 static void loadFont(int detectSize)
 {
 	char font[60];
@@ -89,48 +62,9 @@ static void loadFont(int detectSize)
 
 	SDL_WM_SetIcon(SDL_LoadBMP("icon.bmp"), NULL);
 }
-*/
-
-static void loadFont(int detectSize)
-{
-	char font[60];
-
-	if (detectSize) {
-		int fontWidths[2] = {192, 256}; // widths of the font graphics (divide by 16 to get individual character width)
-		int fontHeights[2] = {256, 1152}; // heights of the font graphics (divide by 16 to get individual character height)
-
-		const SDL_VideoInfo* vInfo = SDL_GetVideoInfo();
-		int screenWidth = desktop_width = vInfo->current_w;
-		int screenHeight = desktop_height = vInfo->current_h;
-
-		if (brogueFontSize < 1 || brogueFontSize > 2) {
-			for (
-				brogueFontSize = 2;
-				brogueFontSize > 1 && (fontWidths[brogueFontSize - 1] * COLS / 16 > screenWidth || fontHeights[brogueFontSize - 1] * ROWS / 48 > screenHeight);
-				brogueFontSize--
-			);
-		}
-	}
-
-	if (brogueFontSize < 1) brogueFontSize = 1;
-	if (brogueFontSize > 2) brogueFontSize = 2;
-
-	sprintf(font, "fonts/font-%i_anim.png", brogueFontSize);
-
-	TCOD_console_set_custom_font(font, (TCOD_FONT_TYPE_GREYSCALE | TCOD_FONT_LAYOUT_ASCII_INROW), 16, 48);
-	TCOD_console_init_root(COLS, ROWS, "Brogue Tiles", false, renderer);
-
-	TCOD_console_map_ascii_codes_to_font(0, 511, 0, 0);
-	TCOD_console_set_keyboard_repeat(175, 30);
-	TCOD_mouse_show_cursor(1);
-
-	SDL_WM_SetIcon(SDL_LoadBMP("icon.bmp"), NULL);
-}
 
 static void gameLoop()
 {
-	init_glyphTable();
-
 	if (SDL_Init(SDL_INIT_VIDEO)) {
 		printf ("Could not start SDL.\n");
 		return;
@@ -142,21 +76,11 @@ static void gameLoop()
 	TCOD_console_delete(NULL);
 }
 
-int sync_anim_time = 800, sync_anim_block = 0, animation_enabled = 1, dancing_colors_enabled = 1;
-
 static void tcod_plotChar(uchar inputChar,
 			  short xLoc, short yLoc,
 			  short foreRed, short foreGreen, short foreBlue,
 			  short backRed, short backGreen, short backBlue) {
-
-	int block = 2;
-
-	if (inputChar < 0) {
-		inputChar = -inputChar;
-		//block = rand() % 3 < 2 ? 0 : 1;
-		block = sync_anim_block;
-	}
-
+	
 	TCOD_color_t fore;
 	TCOD_color_t back;
 	
@@ -202,64 +126,7 @@ static void tcod_plotChar(uchar inputChar,
 			default: inputChar = '?'; break;
 		}
 	}
-
-	struct bufferCell *cell = &BUFFER(xLoc, yLoc);
-	cell->glyph = inputChar;
-	//cell->block = block;
-	cell->block = block;
-	cell->fore = fore;
-	cell->back = back;
-    //cell->ms = (block == 2) ? 0 : (cell->block ? 600 : 500);
-	cell->ms = sync_anim_time;
-	cell->dirty = 1;
-}
-
-static void refresh()
-{
-	if (animation_enabled) {
-		sync_anim_time -= ms_passed;
-		if (sync_anim_time <= 0) {
-			sync_anim_block = 1 - sync_anim_block;
-			sync_anim_time = 900;
-		}
-	}
-
-
-	int x, y;
-	for (y = 0; y < ROWS; y++) {
-		for (x = 0; x < COLS; x++) {
-			struct bufferCell *cell = &BUFFER(x, y);
-
-			if (cell->block != 2) {
-				if (cell->ms > 0) {
-					//cell->ms -= ms_passed;
-					//if (cell->ms <= 0) {
-						//cell->dirty = 1;
-						//cell->block = 1 - cell->block; // toggle between 0 and 1
-						//cell->ms = cell->block ? 600 : 500;
-					//}
-
-					if (cell->block != sync_anim_block) {
-						cell->block = sync_anim_block;
-						cell->dirty = 1;
-					}
-				}
-				if (y < ROWS && glyphTable[cell->glyph].isWall == 2) {
-					if (glyphTable[(cell + COLS)->glyph].isWall != 0) {
-						cell->glyph = 0xb1; // vertical wall
-						cell->dirty = 1;
-					}
-				}
-			}
-			if (cell->dirty) {
-				TCOD_console_put_char_ex(NULL, x, y, cell->glyph + (cell->block << 8), cell->fore, cell->back);
-				cell->dirty = 0;
-			}
-		}
-	}
-
-	ms_passed = 0;
-	TCOD_console_flush();
+	TCOD_console_put_char_ex(NULL, xLoc, yLoc, (int) inputChar, fore, back);
 }
 
 static void initWithFont(int fontSize)
@@ -318,14 +185,7 @@ static boolean processSpecialKeystrokes(TCOD_key_t k, boolean text) {
 		initWithFont(brogueFontSize);
 		TCOD_console_flush();
 		return true;
-	} else if ((k.vk == TCODK_F4) && (!text)) {
-		animation_enabled = !animation_enabled;
-		sync_anim_block = 0;
-		return true;
-	} else if ((k.vk == TCODK_F6) && (!text)) {
-		dancing_colors_enabled = !dancing_colors_enabled;
 	}
-
 	return false;
 }
 
@@ -464,7 +324,7 @@ static boolean processKeystroke(TCOD_key_t key, rogueEvent *returnEvent, boolean
 static boolean tcod_pauseForMilliseconds(short milliseconds)
 {
 	TCOD_mouse_t mouse;
-	refresh();
+	TCOD_console_flush();
 	TCOD_sys_sleep_milli((unsigned int) milliseconds);
 
 	#ifdef USE_NEW_TCOD_API
@@ -502,8 +362,8 @@ static void tcod_nextKeyOrMouseEvent(rogueEvent *returnEvent, boolean textInput,
 	TCOD_mouse_t mouse;
 	uint32 theTime, waitTime;
 	short x, y;
-
-	refresh();
+	
+	TCOD_console_flush();
 
 	key.vk = TCODK_NONE;
 
@@ -571,7 +431,7 @@ static void tcod_nextKeyOrMouseEvent(rogueEvent *returnEvent, boolean textInput,
 				shuffleTerrainColors(3, true);
 				commitDraws();
 			}
-			refresh();
+			TCOD_console_flush();
 		}
 
 		#ifdef USE_NEW_TCOD_API
@@ -647,13 +507,10 @@ static void tcod_nextKeyOrMouseEvent(rogueEvent *returnEvent, boolean textInput,
 			}
 		}
 
-		int elapsed = TCOD_sys_elapsed_milli() - theTime;
-		waitTime = PAUSE_BETWEEN_EVENT_POLLING - elapsed;
-		ms_passed += elapsed;
-
+		waitTime = PAUSE_BETWEEN_EVENT_POLLING + theTime - TCOD_sys_elapsed_milli();
+		
 		if (waitTime > 0 && waitTime <= PAUSE_BETWEEN_EVENT_POLLING) {
 			TCOD_sys_sleep_milli(waitTime);
-			ms_passed += waitTime;
 		}
 	}
 }
