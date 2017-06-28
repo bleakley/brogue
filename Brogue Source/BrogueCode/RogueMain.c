@@ -26,6 +26,23 @@
 #include <math.h>
 #include <time.h>
 
+void summonDebugAlly() {
+    if(DEBUGGING) {
+    if(false) {
+    short x = player.xLoc, y = player.yLoc;
+    creature *monst;
+
+    monst = generateMonster(MK_VALKYRIE, false, false);
+    getQualifyingPathLocNear(&(monst->xLoc), &(monst->yLoc), x, y, true,
+                             T_DIVIDES_LEVEL & avoidedFlagsForMonster(&(monst->info)) & ~T_SPONTANEOUSLY_IGNITES, HAS_PLAYER,
+                             avoidedFlagsForMonster(&(monst->info)) & ~T_SPONTANEOUSLY_IGNITES, (HAS_PLAYER | HAS_MONSTER | HAS_UP_STAIRS | HAS_DOWN_STAIRS), false);
+    monst->bookkeepingFlags &= ~MB_JUST_SUMMONED;
+    becomeAllyWith(monst);
+    pmap[monst->xLoc][monst->yLoc].flags |= HAS_MONSTER;
+    fadeInMonster(monst);
+}}
+}
+
 void rogueMain() {
 	previousGameSeed = 0;
 	initializeBrogueSaveLocation();
@@ -449,24 +466,97 @@ void initializeRogue(unsigned long seed) {
     recalculateEquipmentBonuses();
 	
 	DEBUG {
+	    theItem = generateItem(WEAPON, WHIP);
+        theItem->enchant1 = 2;
+        theItem->enchant2 = W_ENERVATION;
+        theItem->flags &= ~(ITEM_CURSED);
+        theItem->flags |= (ITEM_RUNIC | ITEM_RUNIC_HINTED);
+        identify(theItem);
+        theItem = addItemToPack(theItem);
+
+        theItem = generateItem(ARMOR, LEATHER_ARMOR);
+		theItem->enchant1 = 2;
+		theItem->enchant2 = A_VANISHING;
+		theItem->flags &= ~(ITEM_CURSED | ITEM_RUNIC_HINTED);
+		theItem->flags |= ITEM_RUNIC;
+		identify(theItem);
+		theItem = addItemToPack(theItem);
+
+		theItem = generateItem(ARMOR, LEATHER_ARMOR);
+		theItem->enchant1 = 2;
+		theItem->enchant2 = A_RESPIRATION;
+		theItem->flags &= ~(ITEM_CURSED | ITEM_RUNIC_HINTED);
+		theItem->flags |= ITEM_RUNIC;
+		identify(theItem);
+		theItem = addItemToPack(theItem);
+
+        theItem = generateItem(STAFF, STAFF_FIRE);
+        theItem->enchant1 = 10;
+        theItem->charges = 10;
+        theItem->flags &= ~ITEM_CURSED;
+        identify(theItem);
+        theItem = addItemToPack(theItem);
+
+        theItem = generateItem(STAFF, STAFF_LIGHTNING);
+        theItem->enchant1 = 10;
+        theItem->charges = 10;
+        theItem->flags &= ~ITEM_CURSED;
+        identify(theItem);
+        theItem = addItemToPack(theItem);
+
+        theItem = generateItem(STAFF, STAFF_POISON);
+        theItem->enchant1 = 10;
+        theItem->charges = 10;
+        theItem->flags &= ~ITEM_CURSED;
+        identify(theItem);
+        theItem = addItemToPack(theItem);
+
+        theItem = generateItem(RING, RING_SPELL_CHAINING);
+        theItem->enchant1 = 5;
+        theItem->flags &= ~ITEM_CURSED;
+        identify(theItem);
+        theItem = addItemToPack(theItem);
+
+        theItem = generateItem(RING, RING_SPELL_CHAINING);
+        theItem->enchant1 = 3;
+        theItem->flags &= ~ITEM_CURSED;
+        identify(theItem);
+        theItem = addItemToPack(theItem);
+
 		theItem = generateItem(RING, RING_CLAIRVOYANCE);
+        theItem->enchant1 = 70;
+        theItem->flags &= ~ITEM_CURSED;
+        identify(theItem);
+        theItem = addItemToPack(theItem);
+
+        theItem = generateItem(WAND, WAND_TURRET);
+		theItem->flags &= ~ITEM_CURSED;
+		identify(theItem);
+		theItem = addItemToPack(theItem);
+
+		theItem = generateItem(CHARM, CHARM_TELEPATHY);
+        theItem->enchant1 = 10;
+        identify(theItem);
+        theItem = addItemToPack(theItem);
+
+		/*theItem = generateItem(RING, RING_CLAIRVOYANCE);
 		theItem->enchant1 = max(DROWS, DCOLS);
 		theItem->flags &= ~ITEM_CURSED;
 		identify(theItem);
 		theItem = addItemToPack(theItem);
 		
 		theItem = generateItem(WEAPON, DAGGER);
-		theItem->enchant1 = 50;
-		theItem->enchant2 = W_QUIETUS;
+		theItem->enchant1 = 2;
+		theItem->enchant2 = W_ENERVATION;
 		theItem->flags &= ~(ITEM_CURSED);
 		theItem->flags |= (ITEM_PROTECTED | ITEM_RUNIC | ITEM_RUNIC_HINTED);
-		theItem->damage.lowerBound = theItem->damage.upperBound = 25;
+		//theItem->damage.lowerBound = theItem->damage.upperBound = 25;
 		identify(theItem);
 		theItem = addItemToPack(theItem);
 		
 		theItem = generateItem(ARMOR, LEATHER_ARMOR);
-		theItem->enchant1 = 50;
-		theItem->enchant2 = A_REFLECTION;
+		theItem->enchant1 = 2;
+		theItem->enchant2 = A_VANISHING;
 		theItem->flags &= ~(ITEM_CURSED | ITEM_RUNIC_HINTED);
 		theItem->flags |= (ITEM_PROTECTED | ITEM_RUNIC);
 		identify(theItem);
@@ -562,12 +652,22 @@ void initializeRogue(unsigned long seed) {
 		identify(theItem);
 		theItem = addItemToPack(theItem);
 		
+		theItem = generateItem(WAND, WAND_EMPOWERMENT);
+		theItem->charges = 300;
+		theItem->flags &= ~ITEM_CURSED;
+		identify(theItem);
+		theItem = addItemToPack(theItem);
+
 		theItem = generateItem(RING, RING_AWARENESS);
 		theItem->enchant1 = 30;
 		theItem->flags &= ~ITEM_CURSED;
 		identify(theItem);
 		theItem = addItemToPack(theItem);
         
+		theItem = generateItem(POTION, POTION_TELEPATHY);
+		identify(theItem);
+		theItem = addItemToPack(theItem);*/
+
 //		short i;
 //		for (i=0; i < NUMBER_CHARM_KINDS && i < 4; i++) {
 //			theItem = generateItem(CHARM, i);
@@ -921,6 +1021,9 @@ void startLevel(short oldLevelNumber, short stairDirection) {
 	flushBufferToFile();
     deleteAllFlares(); // So discovering something on the same turn that you fall down a level doesn't flash stuff on the previous level.
     hideCursor();
+    if (rogue.depthLevel == 1) {
+        summonDebugAlly();
+    }
 }
 
 void freeGlobalDynamicGrid(short ***grid) {
@@ -1113,6 +1216,7 @@ void gameOver(char *killedBy, boolean useCustomPhrasing) {
 			player.status[STATUS_NUTRITION] = STOMACH_SIZE;
 		}
 		player.bookkeepingFlags &= ~MB_IS_DYING;
+		heal(&player, 100, true);
 		return;
 	}
 	
@@ -1131,7 +1235,8 @@ void gameOver(char *killedBy, boolean useCustomPhrasing) {
 	if (useCustomPhrasing) {
 		sprintf(buf, "%s on depth %i", killedBy, rogue.depthLevel);
 	} else {
-		sprintf(buf, "Killed by a%s %s on depth %i", (isVowelish(killedBy) ? "n" : ""), killedBy,
+	    boolean unique = (killedBy[0] == 'W');
+		sprintf(buf, "Killed by %s %s on depth %i", (unique?"the":(isVowelish(killedBy) ? "an" : "a")), killedBy,
 				rogue.depthLevel);
 	}
     theEntry.score = rogue.gold;

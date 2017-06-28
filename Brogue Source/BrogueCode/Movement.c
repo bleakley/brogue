@@ -613,7 +613,7 @@ boolean handleWhipAttacks(creature *attacker, enum directions dir, boolean *abor
     originLoc[1] = attacker->yLoc;
     targetLoc[0] = attacker->xLoc + nbDirs[dir][0];
     targetLoc[1] = attacker->yLoc + nbDirs[dir][1];
-    getImpactLoc(strikeLoc, originLoc, targetLoc, 5, false);
+    getImpactLoc(strikeLoc, originLoc, targetLoc, 5, false, false);
     
     defender = monsterAtLoc(strikeLoc[0], strikeLoc[1]);
     if (defender
@@ -633,7 +633,7 @@ boolean handleWhipAttacks(creature *attacker, enum directions dir, boolean *abor
         attacker->bookkeepingFlags &= ~MB_SUBMERGED;
         theBolt = boltCatalog[BOLT_WHIP];
         theBolt.theChar = boltChar[dir];
-        zap(originLoc, targetLoc, &theBolt, false);
+        zap(originLoc, targetLoc, &theBolt, false, NULL);
         return true;
     }
     return false;
@@ -1001,6 +1001,9 @@ boolean playerMoves(short direction) {
 				alreadyRecorded = true;
 			}
 			useStairs(-1);
+		} else if (defender && defender->creatureState == MONSTER_ALLY && defender->info.flags & MONST_ATTACKABLE_THRU_WALLS){
+            //we can't move into an allied turret
+            messageWithColor(tileCatalog[WALL].flavorText, &backgroundMessageColor, false);
 		} else {
 			// Okay, we're finally moving!
 			if (!alreadyRecorded) {

@@ -140,7 +140,7 @@ item *makeItemInto(item *theItem, unsigned long itemCategory, short itemKind) {
 					theItem->flags |= ITEM_ATTACKS_HIT_SLOWLY;
 					break;
                 case WHIP:
-                    theItem->flags |= ITEM_ATTACKS_EXTEND;
+                    theItem->flags |= (ITEM_ATTACKS_EXTEND | ITEM_AGGRAVATE_ATTACKS);
                     break;
 				case RAPIER:
 					theItem->flags |= (ITEM_ATTACKS_QUICKLY | ITEM_LUNGE_ATTACKS);
@@ -169,6 +169,13 @@ item *makeItemInto(item *theItem, unsigned long itemCategory, short itemKind) {
 					if (rand_percent(33)) { // give it a bad runic
 						theItem->enchant2 = rand_range(NUMBER_GOOD_WEAPON_ENCHANT_KINDS, NUMBER_WEAPON_RUNIC_KINDS - 1);
 						theItem->flags |= ITEM_RUNIC;
+						//makes bad runics something you want to use
+						if (rand_percent(40)) {
+                            theItem->enchant1 *= -1;
+                            while (rand_percent(15)) {
+                                theItem->enchant1++;
+                            }
+						}
 					}
 				} else if (rand_range(3, 10)
                            * ((theItem->flags & ITEM_ATTACKS_HIT_SLOWLY) ? 2 : 1)
@@ -217,6 +224,14 @@ item *makeItemInto(item *theItem, unsigned long itemCategory, short itemKind) {
 					if (rand_percent(33)) { // give it a bad runic
 						theItem->enchant2 = rand_range(NUMBER_GOOD_ARMOR_ENCHANT_KINDS, NUMBER_ARMOR_ENCHANT_KINDS - 1);
 						theItem->flags |= ITEM_RUNIC;
+						theItem->flags |= ITEM_CURSED;
+						//makes bad runics something you want to use
+						if (rand_percent(40)) {
+                            theItem->enchant1 *= -1;
+                            while (rand_percent(15)) {
+                                theItem->enchant1++;
+                            }
+						}
 					}
 				} else if (rand_range(0, 95) > theItem->armor) { // give it a good runic
 					theItem->enchant2 = rand_range(0, NUMBER_GOOD_ARMOR_ENCHANT_KINDS - 1);
@@ -1782,6 +1797,7 @@ void itemDetails(char *buf, item *theItem) {
 		"the enemy will be confused",
         "the enemy will be flung",
 		"[slaying]", // never used
+		"the enemy will be weakened",
 		"the enemy will be healed",
 		"the enemy will be cloned"
 	};
@@ -1884,6 +1900,7 @@ void itemDetails(char *buf, item *theItem) {
     }
 	
 	// detailed description
+	boolean doubleRingsEquip = rogue.ringLeft && rogue.ringRight && (rogue.ringLeft == theItem || rogue.ringRight == theItem) && (rogue.ringLeft->kind == rogue.ringRight->kind);
 	switch (theItem->category) {
 			
 		case FOOD:
@@ -2108,6 +2125,9 @@ void itemDetails(char *buf, item *theItem) {
 							
 							if ((theItem->flags & ITEM_IDENTIFIED) || rogue.playbackOmniscience) {
 								switch (theItem->enchant2) {
+								    case W_ENERVATION:
+										strcat(buf, ". ");
+										break;
 									case W_SPEED:
 										strcat(buf, ". ");
 										break;
@@ -2204,6 +2224,19 @@ void itemDetails(char *buf, item *theItem) {
 						// A_MULTIPLICITY, A_MUTUALITY, A_ABSORPTION, A_REPRISAL, A_IMMUNITY, A_REFLECTION, A_BURDEN, A_VULNERABILITY, A_IMMOLATION
 						enchant = netEnchant(theItem);
 						switch (theItem->enchant2) {
+						    case A_VANISHING:
+								sprintf(buf2, "When worn, %i%% of the time that an enemy's attack connects, your attacker will lose your tail as you move to a nearby spot and become invisible for %i turn%s. ",
+										armorVanishChance(enchant),
+										armorVanishDuration(enchant),
+                                        (armorVanishDuration(enchant)>1?"s":""));
+								if (true) {
+									sprintf(buf3, "(If the %s is enchanted, the chance will increase to %i%% and the duration will increase to %i.) ",
+											theName,
+											(armorVanishChance((float) enchant + enchantIncrement(theItem))),
+                                            (armorVanishDuration((float) enchant + enchantIncrement(theItem))));
+									strcat(buf2, buf3);
+								}
+								break;
 							case A_MULTIPLICITY:
 								sprintf(buf2, "When worn, 33%% of the time that an enemy's attack connects, %i allied spectral duplicate%s of your attacker will appear for 3 turns. ",
 										armorImageCount(enchant),
@@ -2269,7 +2302,15 @@ void itemDetails(char *buf, item *theItem) {
                                 }
 								break;
                             case A_RESPIRATION:
-                                strcpy(buf2, "When worn, it will maintain a pocket of fresh air around you, rendering you immune to the effects of steam and all toxic gases. ");
+                                if (theItem->flags & ITEM_IDENTIFIED) {
+                                    sprintf(buf2, "When worn, it will maintain a pocket of fresh air around you, rendering you immune to the effects of steam and all toxic gases for %i turns. (If the %s is enchanted, this duration will %s %i.) ",
+                                            (int) armorRespirationDuration(enchant),
+                                            theName,
+                                            (armorRespirationDuration(enchant) == armorRespirationDuration((float) (enchant + enchantIncrement(theItem))) ? "remain at" : "increase to"),
+                                            (int) armorRespirationDuration((float) (enchant + enchantIncrement(theItem))));
+                                } else {
+                                    strcpy(buf2, "When worn, it will maintain a pocket of fresh air around you, rendering you immune to the effects of steam and all toxic gases for a duration determined by enchantment level. ");
+                                }
                                 break;
                             case A_DAMPENING:
                                 strcpy(buf2, "When worn, it will safely absorb the concussive impact of any explosions (though you may still be burned). ");
@@ -2448,6 +2489,23 @@ void itemDetails(char *buf, item *theItem) {
 			if (((theItem->flags & ITEM_IDENTIFIED) && ringTable[theItem->kind].identified) || rogue.playbackOmniscience) {
                 if (theItem->enchant1) {
                     switch (theItem->kind) {
+                        case RING_SPELL_CHAINING:
+                            if (theItem->enchant1 > 0) {
+                                sprintf(buf2, "\n\nThis ring will cause your spells to ricochet %i%% of the time. (If the ring is enchanted, this will increase to %i%%.)",
+                                        ringChainChance(theItem->enchant1),
+                                        ringChainChance(theItem->enchant1 + 1));
+                            } else {
+                                sprintf(buf2, "\n\nThis ring will cause your spells to ricochet (sometimes back at yourself) %i%% of the time. (If the ring is enchanted, this will decrease to %i%%.)",
+                                        ringChainChance((theItem->enchant1 * -1)),
+                                        ringChainChance((theItem->enchant1 * -1) - 1));
+                            }
+                            if(doubleRingsEquip && (rogue.chaining > 0)) {
+                                sprintf(buf2, "\n\nThe combined effect of both your rings will cause your spells to ricochet %i%% of the time. (If either ring is enchanted, this will increase to %i%%.)",
+                                        ringChainChance(rogue.chaining),
+                                        ringChainChance(rogue.chaining + 1));
+                            }
+                            strcat(buf, buf2);
+                            break;
                         case RING_CLAIRVOYANCE:
                             if (theItem->enchant1 > 0) {
                                 sprintf(buf2, "\n\nThis ring provides magical sight with a radius of %i. (If the ring is enchanted, this will increase to %i.)",
@@ -2458,6 +2516,11 @@ void itemDetails(char *buf, item *theItem) {
                                         (theItem->enchant1 * -1) + 1,
                                         (theItem->enchant1 * -1));
                             }
+                            if(doubleRingsEquip && (rogue.clairvoyance > 0)) {
+                                sprintf(buf2, "\n\nThe combined effect of both your rings provides magical sight with a radius of %i. (If either ring is enchanted, this will increase to %i%.)",
+                                        rogue.clairvoyance + 1,
+                                        rogue.clairvoyance + 2);
+                            }
                             strcat(buf, buf2);
                             break;
                         case RING_REGENERATION:
@@ -2465,6 +2528,12 @@ void itemDetails(char *buf, item *theItem) {
                                     (long) (turnsForFullRegen(theItem->enchant1) / 1000),
                                     (long) TURNS_FOR_FULL_REGEN,
                                     (long) (turnsForFullRegen(theItem->enchant1 + 1) / 1000));
+                            if(doubleRingsEquip && (rogue.regenerationBonus > 0)) {
+                                sprintf(buf2, "\n\nWith both of your rings equipped, you will regenerate all of your health in %li turns (instead of %li). (If either ring is enchanted, this will decrease to %li turns.)",
+                                    (long) (turnsForFullRegen(rogue.regenerationBonus) / 1000),
+                                    (long) TURNS_FOR_FULL_REGEN,
+                                    (long) (turnsForFullRegen(rogue.regenerationBonus + 1) / 1000));
+                            }
                             strcat(buf, buf2);
                             break;
                         case RING_TRANSFERENCE:
@@ -2473,12 +2542,24 @@ void itemDetails(char *buf, item *theItem) {
                                     abs(theItem->enchant1) * 5,
                                     (theItem->enchant1 >= 0 ? "increase" : "decrease"),
                                     abs(theItem->enchant1 + 1) * 5);
+                            if(doubleRingsEquip) {
+                                sprintf(buf2, "\n\nWith both of your rings equipped, dealing direct damage to a creature (whether in melee or otherwise) will %s you by %i%% of the damage dealt. (If either ring is enchanted, this will %s to %i%%.)",
+                                    (rogue.transference >= 0 ? "heal" : "harm"),
+                                    abs(rogue.transference) * 5,
+                                    (rogue.transference >= 0 ? "increase" : "decrease"),
+                                    abs(rogue.transference + 1) * 5);
+                            }
                             strcat(buf, buf2);
                             break;
                         case RING_WISDOM:
                             sprintf(buf2, "\n\nWhen worn, your staffs will recharge at %i%% of their normal rate. (If the ring is enchanted, the rate will increase to %i%% of the normal rate.)",
                                     (int) (100 * pow(1.3, min(27, theItem->enchant1)) + FLOAT_FUDGE),
                                     (int) (100 * pow(1.3, min(27, (theItem->enchant1 + 1))) + FLOAT_FUDGE));
+                            if(doubleRingsEquip && (rogue.wisdomBonus > 0)) {
+                                sprintf(buf2, "\n\nThe combined effect of both your rings will cause your staffs to recharge at %i%% of their normal rate. (If either ring is enchanted, this will increase to %i%% of the normal rate.)",
+                                    (int) (100 * pow(1.3, min(27, rogue.wisdomBonus)) + FLOAT_FUDGE),
+                                    (int) (100 * pow(1.3, min(27, (rogue.wisdomBonus + 1))) + FLOAT_FUDGE));
+                            }
                             strcat(buf, buf2);
                             break;
                         case RING_REAPING:
@@ -2487,6 +2568,13 @@ void itemDetails(char *buf, item *theItem) {
                                     abs(theItem->enchant1),
                                     (theItem->enchant1 >= 0 ? "increase" : "decrease"),
                                     abs(theItem->enchant1 + 1));
+                            if(doubleRingsEquip && (rogue.reaping > 0)) {
+                                sprintf(buf2, "\n\nWith both of your rings equipped, each blow that you land in melee will %s your staffs and charms by 0-%i turns per point of damage dealt. (If either ring is enchanted, this will %s to 0-%i turns per point of damage.)",
+                                    (rogue.reaping >= 0 ? "recharge" : "drain"),
+                                    abs(rogue.reaping),
+                                    (rogue.reaping >= 0 ? "increase" : "decrease"),
+                                    abs(rogue.reaping + 1));
+                            }
                             strcat(buf, buf2);
                             break;
                         default:
@@ -3375,7 +3463,7 @@ short getLineCoordinates(short listOfCoordinates[][2], const short originLoc[2],
 // Takes into account the caster's knowledge; i.e. won't be blocked by monsters
 // that the caster is not aware of.
 void getImpactLoc(short returnLoc[2], const short originLoc[2], const short targetLoc[2],
-				  const short maxDistance, const boolean returnLastEmptySpace) {
+				  const short maxDistance, const boolean returnLastEmptySpace, const boolean conduction) {
     short coords[DCOLS + 1][2];
     short i, n;
 	creature *monst;
@@ -3384,9 +3472,11 @@ void getImpactLoc(short returnLoc[2], const short originLoc[2], const short targ
     n = min(n, maxDistance);
 	for (i=0; i<n; i++) {
         monst = monsterAtLoc(coords[i][0], coords[i][1]);
+        boolean conductiveCell = cellHasTerrainFlag(coords[i][0], coords[i][1], T_CONDUCTIVE);
+        boolean safelySubmerged = monst && (monst->bookkeepingFlags & MB_SUBMERGED) && !(conductiveCell && conduction);
         if (monst
-            && !monsterIsHidden(monst, monsterAtLoc(originLoc[0], originLoc[1]))
-            && !(monst->bookkeepingFlags & MB_SUBMERGED)) {
+            && ((conductiveCell && conduction) || !monsterIsHidden(monst, monsterAtLoc(originLoc[0], originLoc[1])))
+            && !safelySubmerged) {
             // Imaginary bolt hit the player or a monster.
             break;
         }
@@ -3438,6 +3528,27 @@ boolean impermissibleKinkBetween(short x1, short y1, short x2, short y2) {
         return false;
     }
     return true;
+}
+
+boolean buildTurretAlly(short x, short y) {
+    if(pmap[x][y].layers[DUNGEON] == WALL)
+    {
+        pmap[x][y].layers[DUNGEON] = WALL;
+        short turretType[3] = {MK_DART_TURRET, MK_FLAME_TURRET, MK_SPARK_TURRET};
+        shuffleList(turretType, 3);
+        creature *monst;
+        monst = generateMonster(turretType[0], false, false);
+        monst->xLoc = x;
+        monst->yLoc = y;
+        monst->bookkeepingFlags |= (MB_DOES_NOT_TRACK_LEADER);
+        monst->bookkeepingFlags &= ~MB_JUST_SUMMONED;
+        monst->leader = &player;
+        monst->creatureState = MONSTER_ALLY;
+        monst->ticksUntilTurn = 150;
+        pmap[monst->xLoc][monst->yLoc].flags |= HAS_MONSTER;
+        return true;
+    }
+    return false;
 }
 
 boolean tunnelize(short x, short y) {
@@ -3705,6 +3816,12 @@ void heal(creature *monst, short percent, boolean panacea) {
 	char buf[COLS], monstName[COLS];
 	monst->currentHP = min(monst->info.maxHP, monst->currentHP + percent * monst->info.maxHP / 100);
     if (panacea) {
+        if (monst->status[STATUS_PETRIFYING] > 1) {
+            monst->status[STATUS_PETRIFYING] = 0;
+        }
+        if (monst->status[STATUS_DISCORDANT] > 1) {
+            monst->status[STATUS_DISCORDANT] = 1;
+        }
         if (monst->status[STATUS_HALLUCINATING] > 1) {
             monst->status[STATUS_HALLUCINATING] = 1;
         }
@@ -4099,7 +4216,7 @@ void beckonMonster(creature *monst, short x, short y) {
     to[0] = x;
     to[1] = y;
     theBolt.magnitude = max(1, (distanceBetween(x, y, monst->xLoc, monst->yLoc) - 2) / 2);
-    zap(from, to, &theBolt, false);
+    zap(from, to, &theBolt, false, NULL);
     if (monst->ticksUntilTurn < player.attackSpeed+1) {
         monst->ticksUntilTurn = player.attackSpeed+1;
     }
@@ -4132,7 +4249,8 @@ enum boltType boltForItem(item *theItem) {
 // will be set to true. (LightingChanged can be null.)
 boolean updateBolt(bolt *theBolt, creature *caster, short x, short y,
                    boolean boltInView, boolean alreadyReflected,
-                   boolean *autoID, boolean *lightingChanged) {
+                   boolean *autoID, boolean *lightingChanged,
+                   short *forkedTargetX, short *forkedTargetY) {
 	char buf[COLS], monstName[COLS];
     creature *monst; // Creature being hit by the bolt, if any.
     creature *newMonst; // Utility variable for plenty
@@ -4142,10 +4260,22 @@ boolean updateBolt(bolt *theBolt, creature *caster, short x, short y,
         *lightingChanged = false;
     }
     
-    // Handle collisions with monsters.
     
+
+    // Handle collisions with monsters.
     monst = monsterAtLoc(x, y);
-    if (monst && !(monst->bookkeepingFlags & MB_SUBMERGED)) {
+
+    boolean conduction = monst && (theBolt->flags & BF_ELECTRIC) &&
+   !(monst->status[STATUS_LEVITATING]) &&
+   !(monst->info.flags & MONST_INANIMATE) &&
+    cellHasTerrainFlag(x, y, T_CONDUCTIVE);
+    terminateBolt = conduction;
+
+    //TODO: change this so they must be in the same pool
+    boolean conductToCaster = conduction && cellHasTerrainFlag(caster->xLoc, caster->yLoc, T_CONDUCTIVE);
+
+
+    if (monst && (!(monst->bookkeepingFlags & MB_SUBMERGED) || conduction)) {
         monsterName(monstName, monst, true);
         
         switch(theBolt->boltEffect) {
@@ -4421,6 +4551,56 @@ boolean updateBolt(bolt *theBolt, creature *caster, short x, short y,
         if (!(theBolt->flags & BF_PASSES_THRU_CREATURES)) {
             terminateBolt = true;
         }
+
+        //shoot another bolt here
+        if (!(theBolt->flags & BF_NEVER_REFLECTS) &&
+            ((caster == &player && rand_percent(ringChainChance(rogue.chaining))) || conduction )) {
+
+
+            //find the closest eligible monster
+            short shortestDist = 9999;
+            creature *monst2;
+            creature *nearestMonst = NULL;
+            monst->bookkeepingFlags |= MB_TARGETED_IN_CHAIN;
+
+            for (monst2 = monsters->nextCreature; monst2 != NULL; monst2 = monst2->nextCreature) {
+                boolean inWater = cellHasTerrainFlag(monst2->xLoc, monst2->yLoc, T_CONDUCTIVE);
+                if (
+                    //(((monst2->creatureState == MONSTER_ALLY) && theBolt->flags & BF_TARGET_ALLIES)
+                    //|| ((monst2->creatureState != MONSTER_ALLY) && theBolt->flags & BF_TARGET_ENEMIES))
+                    //&&
+                    !(monst2->bookkeepingFlags & MB_TARGETED_IN_CHAIN)
+                    && !(monst2->info.flags & MONST_INANIMATE)
+                    && ((!conduction) || inWater)
+                    && (monst2 != caster)
+                    && (monst2 != monst)
+                    && (!(monst2->bookkeepingFlags & MB_SUBMERGED) || (conduction && inWater))
+                    && openPathBetween(monst->xLoc, monst->yLoc, monst2->xLoc, monst2->yLoc, (conduction && inWater))
+                    //&& (generallyValidBoltTarget(monst, monst2))
+                    ) {
+                    shortestDist = min(shortestDist, distanceBetween(monst->xLoc, monst->yLoc, monst2->xLoc, monst2->yLoc));
+                    if (distanceBetween(monst->xLoc, monst->yLoc, monst2->xLoc, monst2->yLoc) == shortestDist) {
+                        nearestMonst = monst2;
+                    }
+                }
+            }
+
+            if(nearestMonst == NULL || distanceBetween(monst->xLoc, monst->yLoc, caster->xLoc, caster->yLoc) < shortestDist) {
+                if((caster == &player && rogue.chaining < 0) || conductToCaster) {
+                    if(!(caster->bookkeepingFlags & MB_TARGETED_IN_CHAIN)) {
+                        nearestMonst = caster;
+                    }
+                }
+            }
+
+            //zap
+            if((nearestMonst != NULL)) {
+                *forkedTargetX  = nearestMonst->xLoc;
+                *forkedTargetY  = nearestMonst->yLoc;
+                nearestMonst->bookkeepingFlags |= MB_TARGETED_IN_CHAIN;
+                terminateBolt = true;
+            }
+        }
     }
     
     // Handle ordinary bolt updates that aren't dependent on hitting a creature.
@@ -4433,6 +4613,9 @@ boolean updateBolt(bolt *theBolt, creature *caster, short x, short y,
                     *lightingChanged = true;
                 }
             }
+            break;
+        case BE_BUILD_TURRET:
+            terminateBolt = buildTurretAlly(x, y);
             break;
         default:
             break;
@@ -4557,10 +4740,11 @@ void detonateBolt(bolt *theBolt, creature *caster, short x, short y, boolean *au
 }
 
 // returns whether the bolt effect should autoID any staff or wand it came from, if it came from a staff or wand
-boolean zap(short originLoc[2], short targetLoc[2], bolt *theBolt, boolean hideDetails) {
+boolean zap(short originLoc[2], short targetLoc[2], bolt *theBolt, boolean hideDetails, creature *shootingMonst) {
 	short listOfCoordinates[MAX_BOLT_LENGTH][2];
 	short i, j, k, x, y, x2, y2, numCells, blinkDistance, boltLength, initialBoltLength, lights[DCOLS][DROWS][3];
-	creature *monst = NULL, *shootingMonst;
+    short forkedTargetX, forkedTargetY;
+	creature *monst = NULL;
 	char buf[COLS], monstName[COLS];
 	boolean autoID = false;
     boolean lightingChanged = false;
@@ -4568,7 +4752,7 @@ boolean zap(short originLoc[2], short targetLoc[2], bolt *theBolt, boolean hideD
 	boolean alreadyReflected = false;
 	boolean boltInView;
 	const color *boltColor;
-    
+    boolean zerothFork = false;
     uchar theChar;
     color foreColor, backColor, multColor;
 	
@@ -4587,7 +4771,20 @@ boolean zap(short originLoc[2], short targetLoc[2], bolt *theBolt, boolean hideD
     
 	numCells = getLineCoordinates(listOfCoordinates, originLoc, targetLoc);
 	
+    short from[2], to[2];
+    boolean hitFirstTarget = false;
+    forkedTargetX = -1;
+    forkedTargetY = -1;
+
+    if(shootingMonst == NULL) {
+        //this means the bolt hasn't forked yet
+        zerothFork = true;
 	shootingMonst = monsterAtLoc(originLoc[0], originLoc[1]);
+    }
+
+    if ((theBolt->boltEffect == BE_ATTACK) && (shootingMonst->info.abilityFlags & MA_LIMITED_AMMO)) {
+        updateThrownSpears(shootingMonst, false);
+    }
 	
 	if (hideDetails) {
 		boltColor = &gray;
@@ -4667,10 +4864,26 @@ boolean zap(short originLoc[2], short targetLoc[2], bolt *theBolt, boolean hideD
 			continue;
 		}
         
-        if (updateBolt(theBolt, shootingMonst, x, y, boltInView, alreadyReflected, &autoID, &lightingChanged)) {
+
+
+        boolean boltEnds = updateBolt(theBolt, shootingMonst, x, y, boltInView, alreadyReflected, &autoID, &lightingChanged, &forkedTargetX, &forkedTargetY);
+
+        if(!hitFirstTarget && forkedTargetX != -1 && forkedTargetY != -1) {
+            from[0] = x;
+            from[1] = y;
+            to[0] = forkedTargetX;
+            to[1] = forkedTargetY;
+            hitFirstTarget = true;
+            //make sure lightning chains from the right spot
+            //message("beep", false);
+        }
+
+        if (boltEnds) {
             break;
         }
         
+
+
         if (lightingChanged) {
             updateVision(true);
             backUpLighting(lights);
@@ -4800,6 +5013,7 @@ boolean zap(short originLoc[2], short targetLoc[2], bolt *theBolt, boolean hideD
 			if (cellHasTerrainFlag(x2, y2, (T_OBSTRUCTS_VISION | T_OBSTRUCTS_PASSABILITY))
                 && (projectileReflects(shootingMonst, NULL)
                     || cellHasTMFlag(x2, y2, TM_REFLECTS_BOLTS)
+                    || (theBolt->boltEffect == BE_BUILD_TURRET && pmap[x2][y2].layers[DUNGEON] != WALL)
                     || (theBolt->boltEffect == BE_TUNNELING && (pmap[x2][y2].flags & IMPREGNABLE)))
                 && i < MAX_BOLT_LENGTH - max(DCOLS, DROWS)) {
                 
@@ -4888,6 +5102,24 @@ boolean zap(short originLoc[2], short targetLoc[2], bolt *theBolt, boolean hideD
             }
         }
     }
+
+    if(forkedTargetX != -1 && forkedTargetY != -1) {
+
+            bolt forkedBolt;
+            forkedBolt = *theBolt;
+            //sprintf(buf, "%s from %i, %i to %i, %i", forkedBolt.description, from[0], from[1], to[0], to[1]);
+            //message(buf,true);
+            zap(from, to, &forkedBolt, false, shootingMonst);
+        }
+
+        //reset all the fork-related bookkeeping flags
+        player.bookkeepingFlags &= ~MB_TARGETED_IN_CHAIN;
+        for (monst = monsters->nextCreature; monst != NULL; monst = monst->nextCreature) {
+            if(zerothFork == true) {
+                monst->bookkeepingFlags &= ~MB_TARGETED_IN_CHAIN;
+            }
+		}
+
     return autoID;
 }
 
@@ -4931,7 +5163,7 @@ boolean nextTargetAfter(short *returnX,
         newY = deduplicatedTargetList[n][1];
         if ((newX != player.xLoc || newY != player.yLoc)
             && (newX != targetX || newY != targetY)
-            && (!requireOpenPath || openPathBetween(player.xLoc, player.yLoc, newX, newY))) {
+            && (!requireOpenPath || openPathBetween(player.xLoc, player.yLoc, newX, newY, false))) {
             
             brogueAssert(coordinatesAreInMap(newX, newY));
             brogueAssert(n >= 0 && n < targetCount);
@@ -5269,7 +5501,7 @@ boolean chooseTarget(short returnLoc[2],
 			&& (targetAllies == (rogue.lastTarget->creatureState == MONSTER_ALLY))
 			&& rogue.lastTarget->depth == rogue.depthLevel
 			&& !(rogue.lastTarget->bookkeepingFlags & MB_IS_DYING)
-			&& openPathBetween(player.xLoc, player.yLoc, rogue.lastTarget->xLoc, rogue.lastTarget->yLoc)) {
+			&& openPathBetween(player.xLoc, player.yLoc, rogue.lastTarget->xLoc, rogue.lastTarget->yLoc, false)) {
 			
 			monst = rogue.lastTarget;
 		} else {
@@ -5893,7 +6125,7 @@ boolean playerCancelsBlinking(const short originLoc[2], const short targetLoc[2]
         return false;
     }
     
-    getImpactLoc(impactLoc, originLoc, targetLoc, maxDistance > 0 ? maxDistance : DCOLS, true);
+    getImpactLoc(impactLoc, originLoc, targetLoc, maxDistance > 0 ? maxDistance : DCOLS, true, false);
     getLocationFlags(impactLoc[0], impactLoc[1], &tFlags, NULL, NULL, true);
 	if (maxDistance > 0) {
         if ((pmap[impactLoc[0]][impactLoc[1]].flags & DISCOVERED)
@@ -6025,7 +6257,7 @@ boolean useStaffOrWand(item *theItem, boolean *commandsRecorded) {
         if (theItem->charges > 0) {
             autoID = zap(originLoc, zapTarget,
                          &theBolt,
-                         !boltKnown);	// hide bolt details
+                         !boltKnown, NULL);	// hide bolt details
             if (autoID) {
                 if (!tableForItemCategory(theItem->category, NULL)[theItem->kind].identified) {
                     itemName(theItem, buf2, false, false, NULL);
@@ -6472,11 +6704,22 @@ void readScroll(item *theItem) {
 					tempItem->flags &= ~ITEM_CURSED;
 				}
 			}
+			if(REMOVE_CURSE_CURES) {
+                heal(&player, 0, true);
+                if (hadEffect) {
+                    message("your body glows with a cleansing light, and a malevolent energy disperses.", false);
+                } else {
+                    message("your body glows with a cleansing light.", false);
+                }
+			}
+			else
+            {
 			if (hadEffect) {
 				message("your pack glows with a cleansing light, and a malevolent energy disperses.", false);
 			} else {
 				message("your pack glows with a cleansing light, but nothing happens.", false);
 			}
+            }
 			break;
 		case SCROLL_ENCHANTING:
 			identify(theItem);
@@ -7246,7 +7489,7 @@ void updateRingBonuses() {
 	short i;
 	item *rings[2] = {rogue.ringLeft, rogue.ringRight};
 	
-	rogue.clairvoyance = rogue.stealthBonus = rogue.transference
+	rogue.clairvoyance = rogue.stealthBonus = rogue.transference = rogue.chaining
 	= rogue.awarenessBonus = rogue.regenerationBonus = rogue.wisdomBonus = rogue.reaping = 0;
 	rogue.lightMultiplier = 1;
 	
@@ -7276,6 +7519,9 @@ void updateRingBonuses() {
                     break;
                 case RING_REAPING:
                     rogue.reaping += effectiveRingEnchant(rings[i]);
+					break;
+                case RING_SPELL_CHAINING:
+                    rogue.chaining += effectiveRingEnchant(rings[i]);
 					break;
 			}
 		}
@@ -7427,6 +7673,7 @@ unsigned long itemValue(item *theItem) {
 		750,	//W_CONFUSION,
         850,    //W_FORCE,
 		500,	//W_SLAYING,
+		500,	//W_ENERVATION,
 		-1000,	//W_MERCY,
 		-1000,	//W_PLENTY,
 	};
@@ -7439,6 +7686,7 @@ unsigned long itemValue(item *theItem) {
 		900,	//A_REFLECTION,
         750,    //A_RESPIRATION
         500,    //A_DAMPENING
+        500,	//A_VANISHING,
 		-1000,	//A_BURDEN,
 		-1000,	//A_VULNERABILITY,
         -1000,  //A_IMMOLATION,

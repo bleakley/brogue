@@ -55,6 +55,7 @@ void updateFlavorText() {
         if (rogue.armor
             && (rogue.armor->flags & ITEM_RUNIC)
             && rogue.armor->enchant2 == A_RESPIRATION
+            && (player.status[STATUS_RESPIRING] || !rogue.respiration)
             && tileCatalog[pmap[player.xLoc][player.yLoc].layers[highestPriorityLayer(player.xLoc, player.yLoc, false)]].flags & T_RESPIRATION_IMMUNITIES) {
             
             flavorMessage("A pocket of cool, clean air swirls around you.");
@@ -315,13 +316,27 @@ void applyInstantTileEffectsToCreature(creature *monst) {
 		}
 	}
     
+    //reset respiration
+    if (monst == &player && !cellHasTerrainFlag(*x, *y, T_RESPIRATION_IMMUNITIES)) {
+        player.status[STATUS_RESPIRING] = player.maxStatus[STATUS_RESPIRING] = 0;
+        rogue.respiration = false;
+    }
+
     // Toxic gases!
     // If it's the player, and he's wearing armor of respiration, then no effect from toxic gases.
     if (monst == &player
         && cellHasTerrainFlag(*x, *y, T_RESPIRATION_IMMUNITIES)
         && rogue.armor
         && (rogue.armor->flags & ITEM_RUNIC)
-        && rogue.armor->enchant2 == A_RESPIRATION) {
+        && rogue.armor->enchant2 == A_RESPIRATION
+        && (player.status[STATUS_RESPIRING] || !rogue.respiration) ) {
+
+        if(!rogue.respiration) {
+            //if his previous turn was not in hostile gas
+            player.status[STATUS_RESPIRING] = player.maxStatus[STATUS_RESPIRING] = armorRespirationDuration(rogue.armor->enchant1);
+            rogue.respiration = true;
+        }
+
         if (!(rogue.armor->flags & ITEM_RUNIC_IDENTIFIED)) {
             message("Your armor trembles and a pocket of clean air swirls around you.", false);
             autoIdentify(rogue.armor);
@@ -468,7 +483,7 @@ void applyGradualTileEffectsToCreature(creature *monst, short ticks) {
 		damage = max(1, damage);
 		for (layer = 0; layer < NUMBER_TERRAIN_LAYERS && !(tileCatalog[pmap[x][y].layers[layer]].flags & T_CAUSES_DAMAGE); layer++);
 		if (monst == &player) {
-            if (rogue.armor && (rogue.armor->flags & ITEM_RUNIC) && rogue.armor->enchant2 == A_RESPIRATION) {
+            if (rogue.armor && (rogue.armor->flags & ITEM_RUNIC) && rogue.armor->enchant2 == A_RESPIRATION && (player.status[STATUS_RESPIRING] || !rogue.respiration)) {
                 if (!(rogue.armor->flags & ITEM_RUNIC_IDENTIFIED)) {
                     message("Your armor trembles and a pocket of clean air swirls around you.", false);
                     autoIdentify(rogue.armor);
@@ -835,6 +850,7 @@ void flashCreatureAlert(creature *monst, char msg[200], color *foreColor, color 
         x = COLS - strLenWithoutEscapes(msg);
     }
     flashMessage(msg, x, y, (rogue.playbackMode ? 100 : 1000), foreColor, backColor);
+    rogue.autoPlayingLevel = false; //slow down or you'll hurt yourself
     rogue.disturbed = true;
 }
 
@@ -2008,6 +2024,10 @@ void decrementPlayerStatus() {
 		message("you are no longer invisible.", false);
 	}
 	
+    if (player.status[STATUS_RESPIRING]) {
+		player.status[STATUS_RESPIRING]--;
+	}
+
 	if (rogue.monsterSpawnFuse <= 0) {
 		spawnPeriodicHorde();
 		rogue.monsterSpawnFuse = rand_range(125, 175);
@@ -2043,6 +2063,7 @@ void autoRest() {
 			
 			recordKeystroke(REST_KEY, false, false);
 			rogue.justRested = true;
+			search(rogue.awarenessBonus < 0 ? 40 : 80);
 			playerTurnEnded();
 			//refreshSideBar(-1, -1, false);
 			if (pauseBrogue(1)) {
@@ -2245,6 +2266,8 @@ void playerTurnEnded() {
                 processIncrementalAutoID();   // become more familiar with worn armor and rings
 				rogue.monsterSpawnFuse--; // monsters spawn in the level every so often
 				
+                updatePetrification();
+
 				for (monst = monsters->nextCreature; monst != NULL;) {
 					nextMonst = monst->nextCreature;
 					applyInstantTileEffectsToCreature(monst);
@@ -2257,6 +2280,8 @@ void playerTurnEnded() {
 					monst = nextMonst;
 				}
 				
+
+
 				// monsters with a dungeon feature spawn it every so often
 				for (monst = monsters->nextCreature; monst != NULL;) {
 					nextMonst = monst->nextCreature;
@@ -2330,6 +2355,13 @@ void playerTurnEnded() {
 		for(monst = monsters->nextCreature; monst != NULL; monst = monst->nextCreature) {
 			if (canSeeMonster(monst) && !(monst->bookkeepingFlags & (MB_WAS_VISIBLE | MB_ALREADY_SEEN))) {
 				monst->bookkeepingFlags |= MB_WAS_VISIBLE;
+
+				//alert the player if gazing at medusa
+                if ((monst->info.abilityFlags & MA_STONE_GAZE) && !monst->status[STATUS_INVISIBLE] && !player.status[STATUS_HALLUCINATING] && canDirectlySeeMonster(monst)) {
+                        message("you gaze at the medusa!", true);
+                        player.bookkeepingFlags |= MB_GAZED_THIS_TURN;
+                }
+
 				if (monst->creatureState != MONSTER_ALLY) {
 					rogue.disturbed = true;
 					if (rogue.cautiousMode || rogue.automationActive) {
@@ -2458,6 +2490,73 @@ void playerTurnEnded() {
     }
 }
 
+void updatePetrification() {
+    creature *monst, *monst2, *nextMonst;
+
+    //to start with unflag all creatures
+    player.bookkeepingFlags &= ~MB_GAZED_THIS_TURN;
+    for (monst = monsters->nextCreature; monst != NULL;) {
+        nextMonst = monst->nextCreature;
+        monst->bookkeepingFlags &= ~MB_GAZED_THIS_TURN;
+        monst = nextMonst;
+    }
+
+    //next give each creature (including the player) a flag if he can see a medusa
+    // This should be efficient enough because there will never be very many medusas
+    for (monst = monsters->nextCreature; monst != NULL;) {
+        nextMonst = monst->nextCreature;
+        if((monst->info.abilityFlags & MA_STONE_GAZE)
+            && !(monst->status[STATUS_INVISIBLE])) {
+
+            //check if the player can see her
+            if (!player.status[STATUS_HALLUCINATING] && canDirectlySeeMonster(monst)) {
+                player.bookkeepingFlags |= MB_GAZED_THIS_TURN;
+            }
+
+            //check if monsters can see her
+            for (monst2 = monsters->nextCreature; monst2 != NULL;) {
+            nextMonst = monst2->nextCreature;
+                if(monst != monst2
+                   && !(monst2->info.flags & MONST_INANIMATE)
+                   && openPathBetween(monst2->xLoc, monst2->yLoc, monst->xLoc, monst->yLoc, false)) {
+                    monst2->bookkeepingFlags |= MB_GAZED_THIS_TURN;
+
+                    if(!(monst2->info.flags & MONST_NEVER_FLEES)) {
+                        monst2->creatureState = MONSTER_FLEEING;
+                    }
+                }
+                monst2 = nextMonst;
+            }
+        }
+        monst = nextMonst;
+    }
+
+    if(player.bookkeepingFlags & MB_GAZED_THIS_TURN)
+    {
+        messageWithColor("you feel your flesh turning to stone.", &badMessageColor, false);
+        player.maxStatus[STATUS_PETRIFYING] = TURNS_TO_PETRIFY;
+        if(++(player.status[STATUS_PETRIFYING]) > TURNS_TO_PETRIFY) {
+            petrify(&player);
+        }
+    } else {
+        player.maxStatus[STATUS_PETRIFYING] = player.status[STATUS_PETRIFYING] = 0;
+    }
+
+    for (monst = monsters->nextCreature; monst != NULL;) {
+        nextMonst = monst->nextCreature;
+
+        if (monst->bookkeepingFlags & MB_GAZED_THIS_TURN) {
+            monst->maxStatus[STATUS_PETRIFYING] = TURNS_TO_PETRIFY;
+            if(++(monst->status[STATUS_PETRIFYING]) > TURNS_TO_PETRIFY) {
+                petrify(monst);
+            }
+        } else {
+            monst->status[STATUS_PETRIFYING] = monst->maxStatus[STATUS_PETRIFYING] = 0;
+        }
+        monst = nextMonst;
+    }
+}
+
 void resetScentTurnNumber() { // don't want player.scentTurnNumber to roll over the short maxint!
 	short i, j, d;
 	rogue.scentTurnNumber -= 15000;
@@ -2473,5 +2572,34 @@ void resetScentTurnNumber() { // don't want player.scentTurnNumber to roll over 
                 }
             }
         }
+    }
+}
+
+void petrify(creature *victim) {
+    if (victim == &player) {
+        gameOver("Turned to stone", true);
+    }
+    else {
+        char buf[DCOLS * 3], monstName[DCOLS];
+        short x, y;
+        dungeonFeature theStatue;
+        x = victim->xLoc;
+        y = victim->yLoc;
+        monsterName(monstName, victim, true);
+        if (canSeeMonster(victim)) {
+            sprintf(buf, "%s has been petrified", monstName);
+            buf[DCOLS] = '\0';
+            combatMessage(buf, messageColorFromVictim(victim));
+		} else if (victim->creatureState == MONSTER_ALLY) {
+			messageWithColor("you feel a sense of loss.", &badMessageColor, false);
+		}
+		//administrative death, so no DF or other death effects
+		killCreature(victim, true);
+		refreshDungeonCell(x, y);
+		theStatue = dungeonFeatureCatalog[DF_MEDUSA_STATUE];
+		theStatue.startProbability = 1;
+		//it will eventually be replaced with a crumbling statue, so the rogue won't get stuck
+        spawnDungeonFeature(x, y, &theStatue, true, true);
+        createFlare(x, y, SCROLL_ENCHANTMENT_LIGHT);
     }
 }
