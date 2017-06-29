@@ -1712,11 +1712,11 @@ creatureType monsterCatalog[NUMBER_MONSTER_KINDS] = {
 		(MONST_IMMUNE_TO_WEBS | MONST_ALWAYS_USE_ABILITY | MONST_MAINTAINS_DISTANCE | MONST_MALE | MONST_FEMALE), (0)},
 
     // new monsters
-    {0,	"valkyrie",		'V',	&blue,	60,		75,     200,	{10, 15, 2},		20,	50,		100,	DF_RED_BLOOD,	SENTINEL_LIGHT,0,	0,              {BOLT_HASTE},
+    {0,	"valkyrie",		'A',	&blue,	60,		75,     200,	{10, 15, 2},		20,	50,		100,	DF_RED_BLOOD,	SENTINEL_LIGHT,0,	0,              {BOLT_HASTE},
 		(MONST_REFLECT_4 | MONST_FEMALE | MONST_NEVER_FLEES | MONST_FLIES), (MA_ATTACKS_PENETRATE | MA_HIT_DISCORD)},
     {0, "dar assassin",'d',	&red,		30,		70,     160,	{4, 8, 2},		20,	100,	100,	DF_RED_BLOOD,	0,		0,		0,              {0},
 		(MONST_CARRY_ITEM_25 | MONST_MALE | MONST_FEMALE), (MA_POISONS | MA_DEFEND_INVISIBLE)},
-    {0, "medusa", 'M',	&darPriestessColor,     40,	    60,		120,	{4, 12, 1},		20,	100,	100,	DF_RED_BLOOD,   0,   0,	0,  {0},
+    {0, "medusa", 'V',	&darPriestessColor,     40,	    60,		120,	{4, 12, 1},		20,	100,	100,	DF_RED_BLOOD,   0,   0,	0,  {0},
 		(MONST_MAINTAINS_DISTANCE | MONST_FEMALE | MONST_NEVER_SLEEPS), (MA_POISONS | MA_STONE_GAZE)},
     {0, "goblin skirmisher",		'g',	&orange,	12,		10,		150,	{4, 7, 1},		20,	100,	100,	DF_RED_BLOOD,	0,		0,		0,              {BOLT_THROWN_SPEAR},
         (MONST_MAINTAINS_DISTANCE),  (MA_ATTACKS_PENETRATE | MA_AVOID_CORRIDORS | MA_LIMITED_AMMO)},
