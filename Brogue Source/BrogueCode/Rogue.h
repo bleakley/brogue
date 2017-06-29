@@ -31,11 +31,13 @@
 #define USE_UNICODE
 
 // version string -- no more than 16 bytes:
-#define BROGUE_VERSION_STRING "1.7.4"
+#define BROGUE_VERSION_STRING "1.7.4.1"
 
 // debug macros -- define DEBUGGING as 1 to enable wizard mode.
 
 #define DEBUGGING						0
+
+#define REMOVE_CURSE_CURES              0
 
 #define DEBUG							if (DEBUGGING)
 #define MONSTERS_ENABLED				(!DEBUGGING || 1) // Quest room monsters can be generated regardless.
@@ -602,6 +604,10 @@ enum tileType {
     MUD_FLOOR,
     MUD_WALL,
     MUD_DOORWAY,
+    
+    //unfortunate creatures turned to stone
+    MEDUSA_STATUE,
+    MEDUSA_STATUE_CRACKING,
 
 	NUMBER_TILETYPES,
 };
@@ -760,6 +766,7 @@ enum weaponEnchants {
 	W_CONFUSION,
     W_FORCE,
 	W_SLAYING,
+	W_ENERVATION,
 	W_MERCY,
 	NUMBER_GOOD_WEAPON_ENCHANT_KINDS = W_MERCY,
 	W_PLENTY,
@@ -785,6 +792,7 @@ enum armorEnchants {
 	A_REFLECTION,
     A_RESPIRATION,
     A_DAMPENING,
+    A_VANISHING,
 	A_BURDEN,
 	NUMBER_GOOD_ARMOR_ENCHANT_KINDS = A_BURDEN,
 	A_VULNERABILITY,
@@ -798,6 +806,7 @@ enum wandKind {
 	WAND_POLYMORPH,
 	WAND_NEGATION,
 	WAND_DOMINATION,
+    WAND_TURRET,
 	WAND_BECKONING,
 	WAND_PLENTY,
 	WAND_INVISIBILITY,
@@ -833,6 +842,7 @@ enum boltType {
 	BOLT_PLENTY,
 	BOLT_INVISIBILITY,
     BOLT_EMPOWERMENT,
+	BOLT_BUILD_TURRET,
 	BOLT_LIGHTNING,
 	BOLT_FIRE,
 	BOLT_POISON,
@@ -854,6 +864,7 @@ enum boltType {
     BOLT_ACID_TURRET_ATTACK,
     BOLT_ANCIENT_SPIRIT_VINES,
     BOLT_WHIP,
+    BOLT_THROWN_SPEAR,
 	NUMBER_BOLT_KINDS
 };
 
@@ -866,6 +877,7 @@ enum ringKind {
 	RING_AWARENESS,
 	RING_WISDOM,
     RING_REAPING,
+    RING_SPELL_CHAINING,
 	NUMBER_RING_KINDS
 };
 
@@ -978,6 +990,11 @@ enum monsterTypes {
 	MK_PHOENIX,
 	MK_PHOENIX_EGG,
     MK_ANCIENT_SPIRIT,
+	
+    MK_VALKYRIE,
+    MK_DAR_ASSASSIN,
+    MK_MEDUSA,
+    MK_GOBLIN_SKIRMISHER,
 
 	NUMBER_MONSTER_KINDS
 };
@@ -1043,6 +1060,7 @@ enum tileFlags {
 };
 
 #define TURNS_FOR_FULL_REGEN				300
+#define TURNS_TO_PETRIFY                    8
 #define STOMACH_SIZE						2150
 #define HUNGER_THRESHOLD					(STOMACH_SIZE - 1800)
 #define WEAK_THRESHOLD						150
@@ -1234,6 +1252,12 @@ boolean cellHasTerrainFlag(short x, short y, unsigned long flagMask);
 #define armorImageCount(enchant)			(clamp((int) ((enchant) / 3 + FLOAT_FUDGE), 1, 5))
 #define reflectionChance(enchant)			(clamp((100 - (int) (100 * pow(0.85, (enchant)) + FLOAT_FUDGE)), 1, 100))
 
+#define armorRespirationDuration(enchant)   (max(3, (int) (((enchant) * 2) + FLOAT_FUDGE)))
+#define weaponFearDuration(enchant)			(max(3, (int) (((enchant) + 2) * ((enchant) + 2) / 3 + FLOAT_FUDGE)))
+#define ringChainChance(enchant)            (clamp((85 - (int) (100 * pow(0.85, abs((enchant)) + 1) + FLOAT_FUDGE)), 1, 100))
+#define armorVanishChance(enchant)          (clamp((100 - (int) (100 * pow(0.93, (enchant)) + FLOAT_FUDGE)), 1, 100))
+#define armorVanishDuration(enchant)        (max(1, (int) (1 + ((enchant) / 3) + FLOAT_FUDGE)))
+
 #define turnsForFullRegen(bonus)			((long) (1000 * TURNS_FOR_FULL_REGEN * pow(0.75, (bonus)) + 2000 + FLOAT_FUDGE))
 											// This will max out at full regeneration in about two turns.
 											// This is the Syd nerf, after Syd broke the game over his knee with a +18 ring of regeneration.
@@ -1326,9 +1350,10 @@ enum itemFlags {
     ITEM_LUNGE_ATTACKS      = Fl(19),   // rapier
     ITEM_SNEAK_ATTACK_BONUS = Fl(20),   // dagger
     ITEM_PASS_ATTACKS       = Fl(21),   // flail
-
-	ITEM_KIND_AUTO_ID       = Fl(22),	// the item type will become known when the item is picked up.
-	ITEM_PLAYER_AVOIDS		= Fl(23),	// explore and travel will try to avoid picking the item up
+    ITEM_AGGRAVATE_ATTACKS  = Fl(22),   // whip
+    
+	ITEM_KIND_AUTO_ID       = Fl(23),	// the item type will become known when the item is picked up.
+	ITEM_PLAYER_AVOIDS		= Fl(24),	// explore and travel will try to avoid picking the item up
 };
 
 #define KEY_ID_MAXIMUM	20
@@ -1676,6 +1701,10 @@ enum dungeonFeatureTypes {
     // goblin warren:
     DF_STENCH_BURN,
     DF_STENCH_SMOLDER,
+	
+    //unfortunate creatures turned to stone
+    DF_MEDUSA_STATUE,
+    DF_MEDUSA_STATUE_CRACKING,
 
 	NUMBER_DUNGEON_FEATURES,
 };
@@ -1686,7 +1715,8 @@ enum dungeonProfileTypes {
 
     DP_GOBLIN_WARREN,
     DP_SENTINEL_SANCTUARY,
-
+    DP_MEDUSA_LAIR,
+    
     NUMBER_DUNGEON_PROFILES,
 };
 
@@ -1742,6 +1772,7 @@ enum boltEffects {
     BE_HEALING,
     BE_HASTE,
     BE_SHIELDING,
+    BE_BUILD_TURRET,
 };
 
 enum boltFlags {
@@ -1841,7 +1872,8 @@ enum terrainFlagCatalog {
 	T_IS_DF_TRAP					= Fl(19),		// spews gas of type specified in fireType when stepped on
 	T_CAUSES_EXPLOSIVE_DAMAGE		= Fl(20),		// is an explosion; deals higher of 15-20 or 50% damage instantly, but not again for five turns
     T_SACRED                        = Fl(21),       // monsters that aren't allies of the player will avoid stepping here
-
+    T_CONDUCTIVE                    = Fl(22),       // will cause lightning bolts to fork
+	
 	T_OBSTRUCTS_SCENT				= (T_OBSTRUCTS_PASSABILITY | T_OBSTRUCTS_VISION | T_AUTO_DESCENT | T_LAVA_INSTA_DEATH | T_IS_DEEP_WATER | T_SPONTANEOUSLY_IGNITES),
 	T_PATHING_BLOCKER				= (T_OBSTRUCTS_PASSABILITY | T_AUTO_DESCENT | T_IS_DF_TRAP | T_LAVA_INSTA_DEATH | T_IS_DEEP_WATER | T_IS_FIRE | T_SPONTANEOUSLY_IGNITES),
     T_DIVIDES_LEVEL                 = (T_OBSTRUCTS_PASSABILITY | T_AUTO_DESCENT | T_IS_DF_TRAP | T_LAVA_INSTA_DEATH | T_IS_DEEP_WATER),
@@ -1883,6 +1915,9 @@ enum terrainMechanicalFlagCatalog {
 
 enum statusEffects {
     STATUS_DONNING = 0,
+    STATUS_PETRIFYING,
+    STATUS_RESPIRING,
+    STATUS_SLIPPING,
 	STATUS_WEAKENED,
 	STATUS_TELEPATHIC,
 	STATUS_HALLUCINATING,
@@ -1907,6 +1942,7 @@ enum statusEffects {
 	STATUS_SHIELDED,
     STATUS_INVISIBLE,
     STATUS_AGGRAVATING,
+    STATUS_ENRAGED,
 	NUMBER_OF_STATUS_EFFECTS,
 };
 
@@ -1971,6 +2007,8 @@ enum monsterBehaviorFlags {
     MONST_GETS_TURN_ON_ACTIVATION   = Fl(28),   // monster never gets a turn, except when its machine is activated
     MONST_ALWAYS_USE_ABILITY        = Fl(29),   // monster will never fail to use special ability if eligible (no random factor)
     MONST_NO_POLYMORPH              = Fl(30),   // monster cannot result from a polymorph spell (liches, phoenixes and Warden of Yendor)
+	
+    MONST_NEVER_FLEES               = Fl(31),   //never flees, even if allied
 
 	NEGATABLE_TRAITS				= (MONST_INVISIBLE | MONST_DEFEND_DEGRADE_WEAPON | MONST_IMMUNE_TO_WEAPONS | MONST_FLIES
 									   | MONST_FLITS | MONST_IMMUNE_TO_FIRE | MONST_REFLECT_4 | MONST_FIERY | MONST_MAINTAINS_DISTANCE),
@@ -1998,8 +2036,15 @@ enum monsterAbilityFlags {
     MA_ATTACKS_ALL_ADJACENT         = Fl(13),   // monster attacks penetrate one layer of enemies, like a spear
     MA_ATTACKS_EXTEND               = Fl(14),   // monster attacks from a distance in a cardinal direction, like a whip
     MA_AVOID_CORRIDORS              = Fl(15),   // monster will avoid corridors when hunting
+	
+    MA_HIT_DISCORD                  = Fl(16),
+    MA_DEFEND_INVISIBLE             = Fl(17),   // when hit monster monster turn temporarily invisible and moves to a nearby space
+    MA_STONE_GAZE                   = Fl(18),
+    MA_PERM_SUMMON                  = Fl(19),
+    MA_SPELL_CHAIN                  = Fl(20),
+    MA_LIMITED_AMMO                 = Fl(21),   //after he throws a weapon, should be a 33% chance he loses maintains distance, ranged attack and his damage is halved
 
-	SPECIAL_HIT						= (MA_HIT_HALLUCINATE | MA_HIT_STEAL_FLEE | MA_HIT_DEGRADE_ARMOR | MA_POISONS | MA_TRANSFERENCE | MA_CAUSES_WEAKNESS),
+	SPECIAL_HIT						= (MA_HIT_HALLUCINATE | MA_HIT_STEAL_FLEE | MA_HIT_DEGRADE_ARMOR | MA_POISONS | MA_TRANSFERENCE | MA_CAUSES_WEAKNESS | MA_HIT_DISCORD),
 	LEARNABLE_ABILITIES				= (MA_TRANSFERENCE | MA_CAUSES_WEAKNESS),
 
     MA_NON_NEGATABLE_ABILITIES      = (MA_ATTACKS_PENETRATE | MA_ATTACKS_ALL_ADJACENT),
@@ -2031,6 +2076,8 @@ enum monsterBookkeepingFlags {
 	MB_IS_DORMANT				= Fl(20),	// lurking, waiting to burst out
     MB_HAS_SOUL                 = Fl(21),   // slaying the monster will count toward weapon auto-ID
     MB_ALREADY_SEEN             = Fl(22),   // seeing this monster won't interrupt exploration
+    MB_TARGETED_IN_CHAIN        = Fl(23),   // won't get targeted again by the same chain of bolts
+    MB_GAZED_THIS_TURN          = Fl(24),   // won't get targeted by the next fork (but may still be targeted in the same chain of bolts)
 };
 
 // Defines all creatures, which include monsters and the player:
@@ -2203,6 +2250,9 @@ enum featTypes {
 typedef struct playerCharacter {
 	short depthLevel;					// which dungeon level are we on
     short deepestLevel;
+
+    boolean respiration;                // last turn was in hostile gas
+
 	boolean disturbed;					// player should stop auto-acting
 	boolean gameHasEnded;				// stop everything and go to death screen
 	boolean highScoreSaved;				// so that it saves the high score only once
@@ -2302,7 +2352,8 @@ typedef struct playerCharacter {
 	short transference;
 	short wisdomBonus;
     short reaping;
-
+    short chaining;
+    
     // feats:
     boolean featRecord[FEAT_COUNT];
 
@@ -2436,7 +2487,8 @@ enum machineTypes {
 	MT_REWARD_ASTRAL_PORTAL,
     MT_REWARD_GOBLIN_WARREN,
     MT_REWARD_SENTINEL_SANCTUARY,
-
+    MT_REWARD_MEDUSA_LAIR,
+    
     // Amulet holder:
     MT_AMULET_AREA,
 
@@ -2873,7 +2925,7 @@ extern "C" {
 	boolean specifiedPathBetween(short x1, short y1, short x2, short y2,
 								 unsigned long blockingTerrain, unsigned long blockingFlags);
     boolean traversiblePathBetween(creature *monst, short x2, short y2);
-	boolean openPathBetween(short x1, short y1, short x2, short y2);
+	boolean openPathBetween(short x1, short y1, short x2, short y2, boolean conduction);
 	creature *monsterAtLoc(short x, short y);
 	creature *dormantMonsterAtLoc(short x, short y);
 	void perimeterCoords(short returnCoords[2], short n);
@@ -2931,7 +2983,7 @@ extern "C" {
     void aggravateMonsters(short distance, short x, short y, const color *flashColor);
 	short getLineCoordinates(short listOfCoordinates[][2], const short originLoc[2], const short targetLoc[2]);
 	void getImpactLoc(short returnLoc[2], const short originLoc[2], const short targetLoc[2],
-                      const short maxDistance, const boolean returnLastEmptySpace);
+                      const short maxDistance, const boolean returnLastEmptySpace, const boolean conduction);
 	void negate(creature *monst);
     short monsterAccuracyAdjusted(const creature *monst);
     float monsterDamageAdjustmentAmount(const creature *monst);
@@ -2945,7 +2997,7 @@ extern "C" {
 	void checkForMissingKeys(short x, short y);
     enum boltEffects boltEffectForItem(item *theItem);
     enum boltType boltForItem(item *theItem);
-	boolean zap(short originLoc[2], short targetLoc[2], bolt *theBolt, boolean hideDetails);
+	boolean zap(short originLoc[2], short targetLoc[2], bolt *theBolt, boolean hideDetails, creature *shootingMonster);
     boolean nextTargetAfter(short *returnX,
                             short *returnY,
                             short targetX,
@@ -3157,7 +3209,8 @@ extern "C" {
 	void pdsClear(pdsMap *map, short maxDistance, boolean eightWays);
 	void pdsSetDistance(pdsMap *map, short x, short y, short distance);
 	void pdsBatchOutput(pdsMap *map, short **distanceMap);
-
+	void updateThrownSpears(creature *monst, boolean reload);
+	
 #if defined __cplusplus
 }
 #endif

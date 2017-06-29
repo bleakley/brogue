@@ -306,6 +306,12 @@ void moralAttack(creature *attacker, creature *defender) {
 		}
 		defender->status[STATUS_ENTRANCED] = 0;
 		
+        if ((defender->info.abilityFlags & MA_AVOID_CORRIDORS)
+            && (distanceBetween(attacker->xLoc, attacker->yLoc, defender->xLoc, defender->yLoc) > 1)) {
+            defender->status[STATUS_ENRAGED] = defender->maxStatus[STATUS_ENRAGED] = 8;
+            //yes, a spear or pike attack can enrage a monster, but it will only affect one of them
+        }
+
 		if (attacker == &player
 			&& defender->creatureState == MONSTER_ALLY
 			&& !defender->status[STATUS_DISCORDANT]
@@ -322,6 +328,10 @@ void moralAttack(creature *attacker, creature *defender) {
             alertMonster(defender); // this alerts the monster that you're nearby
         }
         
+        if (!(defender->status[STATUS_INVISIBLE]) && (defender->info.abilityFlags & MA_DEFEND_INVISIBLE)) {
+                ninjaVanish(attacker, defender, 10);
+        }
+
 		if ((defender->info.abilityFlags & MA_CLONE_SELF_ON_DEFEND) && alliedCloneCount(defender) < 100) {
 			if (distanceBetween(defender->xLoc, defender->yLoc, attacker->xLoc, attacker->yLoc) <= 1) {
 				splitMonster(defender, attacker->xLoc, attacker->yLoc);
@@ -330,6 +340,66 @@ void moralAttack(creature *attacker, creature *defender) {
 			}
 		}
 	}
+}
+
+void ninjaVanish(creature *attacker, creature *defender, short duration) {
+    short i, x, y, xLocus, yLocus, dirs[8];
+    enum directions dir;
+    char buf[COLS], monstName[DCOLS];
+
+    if (defender != &player) {
+        monsterName(monstName, defender, true);
+        sprintf(buf, "%s vanishes!", monstName);
+        buf[DCOLS] = '\0';
+        message(buf, false);
+    }
+
+    defender->status[STATUS_INVISIBLE] = defender->maxStatus[STATUS_INVISIBLE] = duration;
+    createFlare(defender->xLoc, defender->yLoc, POTION_STRENGTH_LIGHT);
+
+    if (distanceBetween(attacker->xLoc, attacker->yLoc, defender->xLoc, defender->yLoc) == 1) {
+        xLocus = attacker->xLoc;
+        yLocus = attacker->yLoc;
+    } else {
+        xLocus = defender->xLoc;
+        yLocus = defender->yLoc;
+    }
+
+    fillSequentialList(dirs, 8);
+    shuffleList(dirs, 8);
+
+    for (i=0; i<8; i++) {
+        dir = dirs[i];
+        x = xLocus + nbDirs[dir][0];
+        y = yLocus + nbDirs[dir][1];
+        if (!cellHasTerrainFlag(x, y, T_OBSTRUCTS_PASSABILITY) &&
+            (!cellHasTerrainFlag(x, y, T_AUTO_DESCENT) || defender->status[STATUS_LEVITATING]) &&
+            (!cellHasTerrainFlag(x, y, T_LAVA_INSTA_DEATH) || defender->status[STATUS_LEVITATING] || defender->status[STATUS_IMMUNE_TO_FIRE]) &&
+            !(pmap[x][y].flags & HAS_MONSTER)) {
+                pmap[defender->xLoc][defender->yLoc].flags &= ~HAS_MONSTER;
+                refreshDungeonCell(defender->xLoc, defender->yLoc);
+                if(defender == &player){
+                    pmap[player.xLoc][player.yLoc].flags &= ~HAS_PLAYER;
+                    refreshDungeonCell(player.xLoc, player.yLoc);
+                    defender->xLoc = x;
+                    defender->yLoc = y;
+                    pmap[player.xLoc][player.yLoc].flags |= HAS_PLAYER;
+                    updateVision(true);
+                    // get any items at the destination location
+                    if (pmap[player.xLoc][player.yLoc].flags & HAS_ITEM) {
+                        pickUpItemAt(player.xLoc, player.yLoc);
+                    }
+                    attacker->creatureState = MONSTER_WANDERING;
+                } else {
+                    pmap[defender->xLoc][defender->yLoc].flags &= ~HAS_MONSTER;
+                    refreshDungeonCell(defender->xLoc, defender->yLoc);
+                    defender->xLoc = x;
+                    defender->yLoc = y;
+                    pmap[defender->xLoc][defender->yLoc].flags |= HAS_MONSTER;
+                    refreshDungeonCell(defender->xLoc, defender->yLoc);
+                }
+        }
+    }
 }
 
 boolean playerImmuneToMonster(creature *monst) {
@@ -429,6 +499,7 @@ void specialHit(creature *attacker, creature *defender, short damage) {
 					itemName(theItem, buf3, false, true, NULL);
 					sprintf(buf, "%s stole %s!", buf2, buf3);
 					messageWithColor(buf, &badMessageColor, false);
+					rogue.autoPlayingLevel = false; //get your bearings
 				}
 			}
 		}
@@ -445,6 +516,16 @@ void specialHit(creature *attacker, creature *defender, short damage) {
         
 		weaken(defender, 300);
 	}
+	if ((attacker->info.abilityFlags & MA_HIT_DISCORD)
+        && defender != &player
+        && damage > 0
+        && !(defender->info.flags & (MONST_INANIMATE | MONST_INVULNERABLE))) {
+
+		if (canSeeMonster(defender)) {
+            flashMonster(defender, &discordColor, 100);
+        }
+        defender->status[STATUS_DISCORDANT] = defender->maxStatus[STATUS_DISCORDANT] = 30;
+	}
 }
 
 short runicWeaponChance(item *theItem, boolean customEnchantLevel, float enchantLevel) {
@@ -457,6 +538,7 @@ short runicWeaponChance(item *theItem, boolean customEnchantLevel, float enchant
 		0.11,	// W_CONFUSION
         0.15,   // W_FORCE
 		0,		// W_SLAYING
+		0.18,	// W_ENERVATION
 		0,		// W_MERCY
 		0};		// W_PLENTY
 	float rootChance, modifier;
@@ -529,7 +611,7 @@ boolean forceWeaponHit(creature *defender, item *theItem) {
     }
     theBolt = boltCatalog[BOLT_BLINKING];
     theBolt.magnitude = max(1, netEnchant(theItem) + FLOAT_FUDGE);
-    zap(oldLoc, newLoc, &theBolt, false);
+    zap(oldLoc, newLoc, &theBolt, false, NULL);
     if (!(defender->bookkeepingFlags & MB_IS_DYING)
         && distanceBetween(oldLoc[0], oldLoc[1], defender->xLoc, defender->yLoc) > 0
         && distanceBetween(oldLoc[0], oldLoc[1], defender->xLoc, defender->yLoc) < weaponForceDistance(netEnchant(theItem))) {
@@ -649,6 +731,15 @@ void magicWeaponHit(creature *defender, item *theItem, boolean backstabbed) {
 		itemName(theItem, theItemName, false, false, NULL);
 		
 		switch (enchantType) {
+		    case W_ENERVATION:
+				weaken(defender, 300);
+				if (canDirectlySeeMonster(defender)) {
+					sprintf(buf, "%s grows weaker", monstName);
+					buf[DCOLS] = '\0';
+					combatMessage(buf, messageColorFromVictim(defender));
+                    autoID = true;
+				}
+				break;
 			case W_SPEED:
 				if (player.ticksUntilTurn != -1) {
 					sprintf(buf, "your %s trembles and time freezes for a moment", theItemName);
@@ -833,6 +924,13 @@ void applyArmorRunicEffect(char returnString[DCOLS], creature *attacker, short *
 	monsterName(attackerName, attacker, true);
 	
 	switch (rogue.armor->enchant2) {
+	    case A_VANISHING:
+	        if (melee && !(attacker->info.flags & (MONST_INANIMATE | MONST_INVULNERABLE)) && rand_percent(armorVanishChance(enchant))) {
+                    if (!(player.status[STATUS_INVISIBLE])){
+                        ninjaVanish(attacker, &player, armorVanishDuration(enchant));
+                    }
+	        }
+	        break;
 		case A_MULTIPLICITY:
 			if (melee && !(attacker->info.flags & (MONST_INANIMATE | MONST_INVULNERABLE)) && rand_percent(33)) {
 				for (i = 0; i < armorImageCount(enchant); i++) {
@@ -1068,10 +1166,20 @@ boolean attack(creature *attacker, creature *defender, boolean lungeAttack) {
 		return false;
 	}
 	
+
+
 	if (sneakAttack || defenderWasAsleep || defenderWasParalyzed || lungeAttack || attackHit(attacker, defender)) {
 		// If the attack hit:
 		damage = (defender->info.flags & (MONST_IMMUNE_TO_WEAPONS | MONST_INVULNERABLE)
                   ? 0 : randClump(attacker->info.damage) * monsterDamageAdjustmentAmount(attacker));
+                  
+        //whips are loud
+        if (attacker == &player
+            && rogue.weapon
+            && (rogue.weapon->flags & ITEM_AGGRAVATE_ATTACKS)) {
+            player.status[STATUS_AGGRAVATING] = player.maxStatus[STATUS_AGGRAVATING] = 10;
+            rogue.aggroRange = currentAggroValue();
+        }
 		
 		if (sneakAttack || defenderWasAsleep || defenderWasParalyzed) {
             if (defender != &player) {
@@ -1081,13 +1189,14 @@ boolean attack(creature *attacker, creature *defender, boolean lungeAttack) {
                     defender->creatureState = MONSTER_TRACKING_SCENT; // Wake up!
                 }
             }
+
         }
         if (sneakAttack || defenderWasAsleep || defenderWasParalyzed || lungeAttack) {
             if (attacker == &player
                 && rogue.weapon
                 && (rogue.weapon->flags & ITEM_SNEAK_ATTACK_BONUS)) {
                 
-                damage *= 5; // Treble damage for general sneak attacks.
+                damage *= 5; // Quintuple damage for dagger sneak attacks.
             } else {
                 damage *= 3; // Treble damage for general sneak attacks.
             }
@@ -1184,6 +1293,7 @@ boolean attack(creature *attacker, creature *defender, boolean lungeAttack) {
 			if (attacker->info.abilityFlags & SPECIAL_HIT) {
 				specialHit(attacker, defender, (attacker->info.abilityFlags & MA_POISONS) ? poisonDamage : damage);
 			}
+
 			if (armorRunicString[0]) {
 				message(armorRunicString, false);
 				if (rogue.armor && (rogue.armor->flags & ITEM_RUNIC) && rogue.armor->enchant2 == A_BURDEN) {
@@ -1796,3 +1906,5 @@ short monsterPower(const creature *theMonst) {
 	
 	return damageDealt[0];
 }
+
+

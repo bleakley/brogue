@@ -498,6 +498,11 @@ short pickHordeType(short depth, enum monsterTypes summonerType, unsigned long f
 
 void empowerMonster(creature *monst) {
     char theMonsterName[100], buf[200];
+
+    if (monst->info.abilityFlags & MA_LIMITED_AMMO) {
+        updateThrownSpears(monst, true);
+    }
+
     monst->info.maxHP += 15;
     monst->currentHP += (15 * monst->currentHP / (monst->info.maxHP - 15));
     monst->info.defense += 15;
@@ -514,6 +519,67 @@ void empowerMonster(creature *monst) {
         combatMessage(buf, &advancementMessageColor);
     }
 }
+
+void updateThrownSpears(creature *monst, boolean reload) {
+    short i, j;
+    char theMonsterName[100], buf[200];
+    monsterName(theMonsterName, monst, true);
+    if(!reload) {
+        short chanceToRunOut = clamp((short) (100 / (3 + 3*(monst->totalPowerCount)) + FLOAT_FUDGE), 1, 100);
+        enum boltType backupBolts[20];
+
+        //sprintf(buf, "%i%% chance to run out of ammo", chanceToRunOut);
+        //message(buf, false);
+
+        if(rand_percent(chanceToRunOut)) {
+            sprintf(buf, "%s is out of spears.", theMonsterName);
+            message(buf, false);
+            //monster doesn't have a spear anymore
+            monst->info.abilityFlags &= ~MA_ATTACKS_PENETRATE;
+            monst->info.damage.lowerBound -= 2;
+            monst->info.damage.upperBound -= 3;
+            //monster doesn't have a throwing attack anymore
+            for (i = 0; i < 20; i++) {
+                backupBolts[i] = monst->info.bolts[i];
+                monst->info.bolts[i] = BOLT_NONE;
+            }
+            for (i = 0, j = 0; i < 20 && backupBolts[i]; i++) {
+                if (backupBolts[i] != BOLT_THROWN_SPEAR) {
+                    monst->info.bolts[j] = backupBolts[i];
+                    j++;
+                }
+            }
+        }
+    } else {
+        //gets his spear back
+        monst->info.abilityFlags |= MA_ATTACKS_PENETRATE;
+        monst->info.damage.lowerBound += 2;
+        monst->info.damage.upperBound += 3;
+        //but he's more aggressive than before
+        //monst->info.flags |= MONST_MAINTAINS_DISTANCE;
+        for (i = 0; i < 20; i++) {
+            if(monst->info.bolts[i] == BOLT_NONE){
+                monst->info.bolts[i] = BOLT_THROWN_SPEAR;
+                break;
+            }
+        }
+        sprintf(buf, "%s finds a few more spears.", theMonsterName);
+        message(buf, false);
+    }
+
+    boolean noBolts = true;
+    for (i = 0; i < 20; i++) {
+        if(monst->info.bolts[i] != BOLT_NONE) {
+            noBolts = false;
+            break;
+        }
+    }
+    //so he should close to attack, unless he can summon allies
+    if(noBolts && !(monst->info.abilityFlags & MA_CAST_SUMMON)) {
+        monst->info.flags &= ~MONST_MAINTAINS_DISTANCE;
+    }
+}
+
 
 // If placeClone is false, the clone won't get a location
 // and won't set any HAS_MONSTER flags or cause any refreshes;
@@ -1405,6 +1471,7 @@ boolean monsterAvoids(creature *monst, short x, short y) {
     
     // Smart monsters don't attack in corridors if they belong to a group and they can help it.
     if ((monst->info.abilityFlags & MA_AVOID_CORRIDORS)
+        && !(monst->status[STATUS_ENRAGED])
         && monst->creatureState == MONSTER_TRACKING_SCENT
         && (monst->bookkeepingFlags & (MB_FOLLOWER | MB_LEADER))
         && passableArcCount(x, y) >= 2
@@ -1544,7 +1611,7 @@ short awarenessDistance(creature *observer, creature *target) {
          || (observer->bookkeepingFlags & MB_SUBMERGED)
 		 || ((observer->info.flags & MONST_IMMUNE_TO_WEBS) && monsterCanShootWebs(observer)))
 		&& ((target == &player && (pmap[observer->xLoc][observer->yLoc].flags & IN_FIELD_OF_VIEW))
-            || (target != &player && openPathBetween(observer->xLoc, observer->yLoc, target->xLoc, target->yLoc)))) {
+            || (target != &player && openPathBetween(observer->xLoc, observer->yLoc, target->xLoc, target->yLoc, false)))) {
 			// if monster flies or is immobile or waterbound or underwater or can cross pits with webs,
             // use absolute distance.
 			perceivedDistance = scentDistance(observer->xLoc, observer->yLoc, target->xLoc, target->yLoc);
@@ -1658,7 +1725,7 @@ void updateMonsterState(creature *monst) {
         if (monsterFleesFrom(monst, monst2)
             && distanceBetween(x, y, monst2->xLoc, monst2->yLoc) < closestFearedEnemy
             && traversiblePathBetween(monst2, x, y)
-            && openPathBetween(x, y, monst2->xLoc, monst2->yLoc)) {
+            && openPathBetween(x, y, monst2->xLoc, monst2->yLoc, false)) {
             
             closestFearedEnemy = distanceBetween(x, y, monst2->xLoc, monst2->yLoc);
         }
@@ -1876,6 +1943,8 @@ void decrementMonsterStatus(creature *monst) {
                     refreshDungeonCell(monst->xLoc, monst->yLoc);
                 }
                 break;
+            case STATUS_PETRIFYING:
+                break;
             default:
                 if (monst->status[i]) {
                     monst->status[i]--;
@@ -1943,10 +2012,10 @@ boolean specifiedPathBetween(short x1, short y1, short x2, short y2,
 	return true; // should never get here
 }
 
-boolean openPathBetween(short x1, short y1, short x2, short y2) {
+boolean openPathBetween(short x1, short y1, short x2, short y2, boolean conduction) {
 	short returnLoc[2], startLoc[2] = {x1, y1}, targetLoc[2] = {x2, y2};
 	
-	getImpactLoc(returnLoc, startLoc, targetLoc, DCOLS, false);
+	getImpactLoc(returnLoc, startLoc, targetLoc, DCOLS, false, conduction);
 	if (returnLoc[0] == targetLoc[0] && returnLoc[1] == targetLoc[1]) {
 		return true;
 	}
@@ -2219,7 +2288,7 @@ boolean monsterBlinkToPreferenceMap(creature *monst, short **preferenceMap, bool
 		target[0] += monst->xLoc;
 		target[1] += monst->yLoc;
 		
-		getImpactLoc(impact, origin, target, maxDistance, true);
+		getImpactLoc(impact, origin, target, maxDistance, true, false);
 		nowPreference = preferenceMap[impact[0]][impact[1]];
 		
 		if (((blinkUphill && (nowPreference > bestPreference))
@@ -2248,7 +2317,7 @@ boolean monsterBlinkToPreferenceMap(creature *monst, short **preferenceMap, bool
 		}
 		monst->ticksUntilTurn = monst->attackSpeed * (monst->info.flags & MONST_CAST_SPELLS_SLOWLY ? 2 : 1);
         theBolt = boltCatalog[theBoltType];
-		zap(origin, bestTarget, &theBolt, false);
+		zap(origin, bestTarget, &theBolt, false, NULL);
 		return true;
 	}
 	return false;
@@ -2355,7 +2424,7 @@ boolean generallyValidBoltTarget(creature *caster, creature *target) {
         // No bolt will affect a submerged creature. Can't shoot at invisible creatures unless it's in gas.
         return false;
     }
-    return openPathBetween(caster->xLoc, caster->yLoc, target->xLoc, target->yLoc);
+    return openPathBetween(caster->xLoc, caster->yLoc, target->xLoc, target->yLoc, false);
 }
 
 boolean targetEligibleForCombatBuff(creature *caster, creature *target) {
@@ -2563,7 +2632,7 @@ void monsterCastSpell(creature *caster, creature *target, enum boltType boltInde
     originLoc[1] = caster->yLoc;
     targetLoc[0] = target->xLoc;
     targetLoc[1] = target->yLoc;
-    zap(originLoc, targetLoc, &theBolt, false);
+    zap(originLoc, targetLoc, &theBolt, false, NULL);
     
     if (player.currentHP <= 0) {
         gameOver(monsterCatalog[caster->info.monsterID].monsterName, false);
@@ -2762,6 +2831,10 @@ boolean allyFlees(creature *ally, creature *closestEnemy) {
         return false; // No one to flee from.
     }
     
+    if (ally->info.flags & MONST_NEVER_FLEES) {
+        return false;
+    }
+
     if (ally->info.maxHP <= 1 || (ally->status[STATUS_LIFESPAN_REMAINING]) > 0) { // Spectral blades and timed allies should never flee.
         return false;
     }
@@ -3237,6 +3310,19 @@ void monstersTurn(creature *monst) {
         }
 		
 		if (fleeingMonsterAwareOfPlayer(monst)) {
+
+            if(openPathBetween(player.xLoc, player.yLoc, monst->xLoc, monst->yLoc, false)
+               && (monst->info.abilityFlags & MA_HIT_STEAL_FLEE)
+               && monst->carriedItem
+               && monst->carriedItem->category == POTION
+               && monst->carriedItem->kind >= POTION_POISON //any cursed potion
+               && monst->carriedItem->kind != POTION_HALLUCINATION
+               && distanceBetween(player.xLoc, player.yLoc, monst->xLoc, monst->yLoc) > 8) {
+                    short potionTarget[] = {player.xLoc, player.yLoc};
+                    throwItem(monst->carriedItem, monst, potionTarget, 15);
+                    monst->carriedItem = NULL;
+               }
+
 			if (monst->safetyMap) {
 				freeGrid(monst->safetyMap);
 				monst->safetyMap = NULL;
@@ -3951,7 +4037,7 @@ boolean staffOrWandEffectOnMonsterDescription(char *newText, item *theItem, crea
                             theItemName,
                             theItem->inventoryLetter,
                             monstName,
-                            100 * staffPoison(theItem->enchant1) / monst->currentHP);
+                            100 * staffPoison(theItem->enchant1) * (1 + monst->poisonAmount) / monst->currentHP);
                 }
                 successfulDescription = true;
                 break;
