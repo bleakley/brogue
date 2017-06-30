@@ -12,7 +12,7 @@ Brogue+ is not intended to take Brogue in a more Nethacky direction; it just off
 
 #### How to Download and Play
 
-Windows-only executables are available under releases. ASCII and tiles versions are both available.
+Windows-only executables are [available under releases](https://github.com/bleakley/brogue/releases). ASCII and tiles versions are both available.
 
 #### Gameplay Changes
 
@@ -25,7 +25,7 @@ Windows-only executables are available under releases. ASCII and tiles versions 
   * Imps and monkeys sometimes throw cursed potions.
   * 40% of all cursed runics have positive enchantment, some have very high enchantment.
   * Captive naga and trolls are less common and are found at deeper depths.
-  * Whips cause an aggravate monsters effect on a sneak attack.
+  * Whips worsen your stealth radius when you attack. (They are loud!)
   * Empowerment now cures discord and 'reloads' skirmishers with ammo.
   * Kraken now attack all adjacent enemies.
   * Spiders do more damage.
@@ -43,7 +43,7 @@ Windows-only executables are available under releases. ASCII and tiles versions 
   * Autopilot now ends if an item is stolen from you or if you pass a health alert threshold.
 
 #### Credits
-Thanks to Pender for making this wonderful game, thanks to andrewdoull for the wand of fortifications and Guitar for the medusa.
+Thanks to Pender for making this wonderful game, thanks to andrewdoull and Guitar (from the old Brogue forums) for their ideas for the wand of fortifications and the medusa.
 
 #### Known Issues
 Very rarely, a medusa doesn't seem to petrify anyone (including the player).  This bug is hard to repeat and I don't know the cause.
