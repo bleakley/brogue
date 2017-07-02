@@ -429,6 +429,7 @@ void specialHit(creature *attacker, creature *defender, short damage) {
 					itemName(theItem, buf3, false, true, NULL);
 					sprintf(buf, "%s stole %s!", buf2, buf3);
 					messageWithColor(buf, &badMessageColor, false);
+					rogue.autoPlayingLevel = false; //get your bearings
 				}
 			}
 		}
@@ -1087,7 +1088,7 @@ boolean attack(creature *attacker, creature *defender, boolean lungeAttack) {
                 && rogue.weapon
                 && (rogue.weapon->flags & ITEM_SNEAK_ATTACK_BONUS)) {
                 
-                damage *= 5; // Treble damage for general sneak attacks.
+                damage *= 5; // Quintuple damage for general sneak attacks.
             } else {
                 damage *= 3; // Treble damage for general sneak attacks.
             }

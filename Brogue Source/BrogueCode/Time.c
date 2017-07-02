@@ -835,6 +835,7 @@ void flashCreatureAlert(creature *monst, char msg[200], color *foreColor, color 
         x = COLS - strLenWithoutEscapes(msg);
     }
     flashMessage(msg, x, y, (rogue.playbackMode ? 100 : 1000), foreColor, backColor);
+    rogue.autoPlayingLevel = false; //slow down or you'll hurt yourself
     rogue.disturbed = true;
 }
 

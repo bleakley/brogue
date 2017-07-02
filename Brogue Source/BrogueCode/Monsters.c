@@ -3951,7 +3951,7 @@ boolean staffOrWandEffectOnMonsterDescription(char *newText, item *theItem, crea
                             theItemName,
                             theItem->inventoryLetter,
                             monstName,
-                            100 * staffPoison(theItem->enchant1) / monst->currentHP);
+                            100 * staffPoison(theItem->enchant1) * (1 + monst->poisonAmount) / monst->currentHP);
                 }
                 successfulDescription = true;
                 break;

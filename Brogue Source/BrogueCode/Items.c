@@ -1884,6 +1884,7 @@ void itemDetails(char *buf, item *theItem) {
     }
 	
 	// detailed description
+	boolean doubleRingsEquip = rogue.ringLeft && rogue.ringRight && (rogue.ringLeft == theItem || rogue.ringRight == theItem) && (rogue.ringLeft->kind == rogue.ringRight->kind);
 	switch (theItem->category) {
 			
 		case FOOD:
@@ -2458,6 +2459,11 @@ void itemDetails(char *buf, item *theItem) {
                                         (theItem->enchant1 * -1) + 1,
                                         (theItem->enchant1 * -1));
                             }
+                            if(doubleRingsEquip && (rogue.clairvoyance > 0)) {
+                                sprintf(buf2, "\n\nThe combined effect of both your rings provides magical sight with a radius of %i. (If either ring is enchanted, this will increase to %i%.)",
+                                rogue.clairvoyance + 1,
+                                rogue.clairvoyance + 2);
+                            }
                             strcat(buf, buf2);
                             break;
                         case RING_REGENERATION:
@@ -2465,6 +2471,12 @@ void itemDetails(char *buf, item *theItem) {
                                     (long) (turnsForFullRegen(theItem->enchant1) / 1000),
                                     (long) TURNS_FOR_FULL_REGEN,
                                     (long) (turnsForFullRegen(theItem->enchant1 + 1) / 1000));
+                            if(doubleRingsEquip && (rogue.regenerationBonus > 0)) {
+                                sprintf(buf2, "\n\nWith both of your rings equipped, you will regenerate all of your health in %li turns (instead of %li). (If either ring is enchanted, this will decrease to %li turns.)",
+                                (long) (turnsForFullRegen(rogue.regenerationBonus) / 1000),
+                                (long) TURNS_FOR_FULL_REGEN,
+                                (long) (turnsForFullRegen(rogue.regenerationBonus + 1) / 1000));
+                            }
                             strcat(buf, buf2);
                             break;
                         case RING_TRANSFERENCE:
@@ -2473,12 +2485,24 @@ void itemDetails(char *buf, item *theItem) {
                                     abs(theItem->enchant1) * 5,
                                     (theItem->enchant1 >= 0 ? "increase" : "decrease"),
                                     abs(theItem->enchant1 + 1) * 5);
+                            if(doubleRingsEquip) {
+                                sprintf(buf2, "\n\nWith both of your rings equipped, dealing direct damage to a creature (whether in melee or otherwise) will %s you by %i%% of the damage dealt. (If either ring is enchanted, this will %s to %i%%.)",
+                                (rogue.transference >= 0 ? "heal" : "harm"),
+                                abs(rogue.transference) * 5,
+                                (rogue.transference >= 0 ? "increase" : "decrease"),
+                                abs(rogue.transference + 1) * 5);
+                            }
                             strcat(buf, buf2);
                             break;
                         case RING_WISDOM:
                             sprintf(buf2, "\n\nWhen worn, your staffs will recharge at %i%% of their normal rate. (If the ring is enchanted, the rate will increase to %i%% of the normal rate.)",
                                     (int) (100 * pow(1.3, min(27, theItem->enchant1)) + FLOAT_FUDGE),
                                     (int) (100 * pow(1.3, min(27, (theItem->enchant1 + 1))) + FLOAT_FUDGE));
+                            if(doubleRingsEquip && (rogue.wisdomBonus > 0)) {
+                                sprintf(buf2, "\n\nThe combined effect of both your rings will cause your staffs to recharge at %i%% of their normal rate. (If either ring is enchanted, this will increase to %i%% of the normal rate.)",
+                                (int) (100 * pow(1.3, min(27, rogue.wisdomBonus)) + FLOAT_FUDGE),
+                                (int) (100 * pow(1.3, min(27, (rogue.wisdomBonus + 1))) + FLOAT_FUDGE));
+                            }
                             strcat(buf, buf2);
                             break;
                         case RING_REAPING:
@@ -2487,6 +2511,13 @@ void itemDetails(char *buf, item *theItem) {
                                     abs(theItem->enchant1),
                                     (theItem->enchant1 >= 0 ? "increase" : "decrease"),
                                     abs(theItem->enchant1 + 1));
+                            if(doubleRingsEquip && (rogue.reaping > 0)) {
+                                sprintf(buf2, "\n\nWith both of your rings equipped, each blow that you land in melee will %s your staffs and charms by 0-%i turns per point of damage dealt. (If either ring is enchanted, this will %s to 0-%i turns per point of damage.)",
+                                (rogue.reaping >= 0 ? "recharge" : "drain"),
+                                abs(rogue.reaping),
+                                (rogue.reaping >= 0 ? "increase" : "decrease"),
+                                abs(rogue.reaping + 1));
+                            }
                             strcat(buf, buf2);
                             break;
                         default:
