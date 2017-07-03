@@ -2,6 +2,8 @@
 
 Brogue+ is not intended to take Brogue in a more Nethacky direction; it just offers a few new features that I think fit well within Brogue's already very elegant systems.
 
+If you are not interested in new content, [a version is also available](https://github.com/bleakley/brogue/tree/vanilla-ui) with only UI improvements and non-breaking bugfixes. That version is fully compatible with saves and replays from vanilla 1.7.4.
+
 #### New Content
 
   * New monsters: goblin skirmisher and dar assassin
