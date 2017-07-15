@@ -1345,26 +1345,23 @@ void getCellAppearance(short x, short y, uchar *returnChar, color *returnForeCol
         }
     }
 	
-	if (rogue.trueColorMode
-        && playerCanSeeOrSense(x, y)) {
-        
-		if (displayDetail[x][y] == DV_DARK) {
-            applyColorMultiplier(&cellForeColor, &inDarknessMultiplierColor);
-            applyColorMultiplier(&cellBackColor, &inDarknessMultiplierColor);
-            
-			applyColorAugment(&cellForeColor, &purple, 10);
-			applyColorAugment(&cellBackColor, &white, -10);
-			applyColorAverage(&cellBackColor, &purple, 20);
-		} else if (displayDetail[x][y] == DV_LIT) {
-            
-			colorMultiplierFromDungeonLight(x, y, &lightMultiplierColor);
-            normColor(&lightMultiplierColor, 175, 50);
-            //applyColorMultiplier(&cellForeColor, &lightMultiplierColor);
-            //applyColorMultiplier(&cellBackColor, &lightMultiplierColor);
-			applyColorAugment(&cellForeColor, &lightMultiplierColor, 5);
-			applyColorAugment(&cellBackColor, &lightMultiplierColor, 5);
-		}
-	}
+if (playerCanSeeOrSense(x, y) && rogue.displayAggroRangeMode)
+{
+    if (displayDetail[x][y] == DV_DARK)
+    {
+        applyColorAverage(&cellForeColor, &black, 40);
+        applyColorAverage(&cellBackColor, &black, 70);
+
+        applyColorAverage(&cellForeColor, &blue, 30);
+        applyColorAverage(&cellBackColor, &purple, 20);
+    }
+    else
+    if (displayDetail[x][y] == DV_LIT)
+    {
+        applyColorAverage(&cellForeColor, &white, 50);
+        applyColorAverage(&cellBackColor, &yellow, 20);
+    }
+}
 	
 	if (needDistinctness) {
 		separateColors(&cellForeColor, &cellBackColor);
